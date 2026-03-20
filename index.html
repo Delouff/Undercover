@@ -509,6 +509,7 @@
             const createBtn = document.getElementById('createSessionBtn');
             const joinBtn = document.getElementById('joinSessionBtn');
             const sharedSessionCode = getSessionCodeFromUrl();
+            const savedOnlineAuth = loadOnlineSessionAuth();
             if (createBtn) {
                 createBtn.addEventListener('click', function() {
                     showCreateSessionDialog();
@@ -522,13 +523,29 @@
 
             if (sharedSessionCode) {
                 window.setTimeout(() => {
-                    showJoinSessionDialog(sharedSessionCode);
+                    if (savedOnlineAuth && savedOnlineAuth.code === sharedSessionCode) {
+                        startOnlineSession(savedOnlineAuth).catch((error) => {
+                            clearOnlineSessionAuth();
+                            showJoinSessionDialog(sharedSessionCode);
+                            console.error(error);
+                        });
+                        return;
+                    }
+
+                    showJoinSessionDialog(sharedSessionCode, savedOnlineAuth ? savedOnlineAuth.playerName : '');
                 }, 120);
             }
         });
 
         let sessionState = null;
         let localGameSettings = null;
+        let onlineSessionRuntime = {
+            auth: null,
+            pollTimer: null,
+            lastRevision: null,
+            lastStatus: null
+        };
+        const ONLINE_AUTH_STORAGE_KEY = 'undercover_online_auth';
 
         function getDefaultSessionSettings() {
             return {
@@ -703,6 +720,11 @@
         }
 
         function restartAfterGame() {
+            if (onlineSessionRuntime.auth) {
+                refreshOnlineSession(true);
+                return;
+            }
+
             if (sessionState && sessionState.code) {
                 showWaitingRoomScreen(sessionState.code, {
                     isHost: sessionState.isHost,
@@ -810,6 +832,163 @@
             return code ? code.trim().toUpperCase() : '';
         }
 
+        function isServedByNodeServer() {
+            return window.location.protocol === 'http:' || window.location.protocol === 'https:';
+        }
+
+        function loadOnlineSessionAuth() {
+            try {
+                const rawValue = window.localStorage.getItem(ONLINE_AUTH_STORAGE_KEY);
+                if (!rawValue) return null;
+
+                const parsed = JSON.parse(rawValue);
+                if (!parsed || !parsed.code || !parsed.playerId) {
+                    return null;
+                }
+
+                return {
+                    code: String(parsed.code).trim().toUpperCase(),
+                    playerId: String(parsed.playerId).trim(),
+                    playerName: normalizePlayerName(parsed.playerName || '')
+                };
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function saveOnlineSessionAuth(auth) {
+            const normalizedAuth = {
+                code: String(auth.code || '').trim().toUpperCase(),
+                playerId: String(auth.playerId || '').trim(),
+                playerName: normalizePlayerName(auth.playerName || '')
+            };
+
+            onlineSessionRuntime.auth = normalizedAuth;
+            window.localStorage.setItem(ONLINE_AUTH_STORAGE_KEY, JSON.stringify(normalizedAuth));
+        }
+
+        function clearOnlineSessionAuth() {
+            onlineSessionRuntime.auth = null;
+            onlineSessionRuntime.lastRevision = null;
+            onlineSessionRuntime.lastStatus = null;
+            window.localStorage.removeItem(ONLINE_AUTH_STORAGE_KEY);
+        }
+
+        function stopOnlineSessionPolling() {
+            if (onlineSessionRuntime.pollTimer) {
+                window.clearTimeout(onlineSessionRuntime.pollTimer);
+                onlineSessionRuntime.pollTimer = null;
+            }
+        }
+
+        function getServerHelpMessage() {
+            return `Le mode multijoueur local a besoin du serveur Node.<br><br>Lance <b>node server.js</b> dans le dossier du projet, puis ouvre le jeu via l'adresse locale du serveur, par exemple <b>http://TON-IP:3000</b>.`;
+        }
+
+        async function apiRequest(path, options = {}) {
+            const { method = 'GET', body } = options;
+            const requestOptions = {
+                method,
+                headers: {}
+            };
+
+            if (body !== undefined) {
+                requestOptions.headers['Content-Type'] = 'application/json';
+                requestOptions.body = JSON.stringify(body);
+            }
+
+            let response;
+            try {
+                response = await fetch(path, requestOptions);
+            } catch (error) {
+                throw new Error("Impossible de contacter le serveur local. Lance d'abord node server.js.");
+            }
+
+            const text = await response.text();
+            let data = {};
+
+            if (text) {
+                try {
+                    data = JSON.parse(text);
+                } catch (error) {
+                    data = { error: text };
+                }
+            }
+
+            if (!response.ok) {
+                throw new Error(data.error || `Erreur ${response.status}`);
+            }
+
+            return data;
+        }
+
+        function scheduleOnlineSessionRefresh(delay = 1200) {
+            stopOnlineSessionPolling();
+            if (!onlineSessionRuntime.auth) return;
+
+            onlineSessionRuntime.pollTimer = window.setTimeout(() => {
+                refreshOnlineSession().catch((error) => {
+                    console.error(error);
+                });
+            }, delay);
+        }
+
+        async function refreshOnlineSession(forceRender = false) {
+            if (!onlineSessionRuntime.auth) return;
+
+            try {
+                const auth = onlineSessionRuntime.auth;
+                const query = new URLSearchParams({
+                    code: auth.code,
+                    playerId: auth.playerId
+                });
+                const view = await apiRequest(`/api/session/state?${query.toString()}`);
+
+                if (
+                    forceRender
+                    || onlineSessionRuntime.lastRevision !== view.revision
+                    || onlineSessionRuntime.lastStatus !== view.status
+                ) {
+                    onlineSessionRuntime.lastRevision = view.revision;
+                    onlineSessionRuntime.lastStatus = view.status;
+                    renderOnlineSessionState(view);
+                }
+
+                scheduleOnlineSessionRefresh();
+            } catch (error) {
+                stopOnlineSessionPolling();
+                clearOnlineSessionAuth();
+                showInfoDialog('Session indisponible', `${escapeHtml(error.message)}<br><br>${getServerHelpMessage()}`);
+            }
+        }
+
+        async function startOnlineSession(auth) {
+            saveOnlineSessionAuth(auth);
+            await refreshOnlineSession(true);
+        }
+
+        async function performOnlineAction(path, body) {
+            const auth = onlineSessionRuntime.auth;
+            if (!auth) {
+                throw new Error('Aucune session multijoueur active.');
+            }
+
+            return apiRequest(path, {
+                method: 'POST',
+                body: {
+                    code: auth.code,
+                    playerId: auth.playerId,
+                    ...body
+                }
+            });
+        }
+
+        function leaveOnlineSession() {
+            stopOnlineSessionPolling();
+            clearOnlineSessionAuth();
+            window.location.href = window.location.pathname;
+        }
+
         function showShareSessionDialog(code) {
             const shareUrl = getSessionShareUrl(code);
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(shareUrl)}`;
@@ -891,13 +1070,32 @@
                     return;
                 }
 
-                closeDialog(overlay);
-                const code = createSessionCode();
-                showWaitingRoomScreen(code, {
-                    isHost: true,
-                    settings: getDefaultSessionSettings(),
-                    playerName: playerName
-                });
+                if (!isServedByNodeServer()) {
+                    errorBox.innerHTML = getServerHelpMessage();
+                    errorBox.style.display = 'block';
+                    return;
+                }
+
+                submitCreateSessionRequest(playerName);
+            }
+
+            async function submitCreateSessionRequest(playerName) {
+                try {
+                    const createdSession = await apiRequest('/api/session/create', {
+                        method: 'POST',
+                        body: {
+                            playerName,
+                            settings: getDefaultSessionSettings()
+                        }
+                    });
+
+                    closeDialog(overlay);
+                    await startOnlineSession(createdSession);
+                } catch (error) {
+                    errorBox.innerHTML = escapeHtml(error.message);
+                    errorBox.style.display = 'block';
+                    input.focus();
+                }
             }
         }
 
@@ -955,12 +1153,31 @@
                     return;
                 }
 
-                closeDialog(overlay);
-                showWaitingRoomScreen(code, {
-                    isHost: false,
-                    settings: getSessionSettingsFromUrl(),
-                    playerName: playerName
-                });
+                if (!isServedByNodeServer()) {
+                    errorBox.innerHTML = getServerHelpMessage();
+                    errorBox.style.display = 'block';
+                    return;
+                }
+
+                submitJoinSessionRequest(code, playerName);
+            }
+
+            async function submitJoinSessionRequest(code, playerName) {
+                try {
+                    const joinedSession = await apiRequest('/api/session/join', {
+                        method: 'POST',
+                        body: {
+                            code,
+                            playerName
+                        }
+                    });
+
+                    closeDialog(overlay);
+                    await startOnlineSession(joinedSession);
+                } catch (error) {
+                    errorBox.innerHTML = escapeHtml(error.message);
+                    errorBox.style.display = 'block';
+                }
             }
         }
 
@@ -1848,7 +2065,330 @@
             });
         }
 
+        function renderOnlineSessionState(view) {
+            if (view.status === 'waiting') {
+                renderOnlineWaitingRoom(view);
+                return;
+            }
+
+            if (view.status === 'secrets') {
+                renderOnlineSecretScreen(view);
+                return;
+            }
+
+            renderOnlineClueScreen(view);
+        }
+
+        function renderOnlineWaitingRoom(view) {
+            const playersBlock = view.players.map((player) => {
+                const modifier = player.isHost ? 'waiting-list-item--host' : 'waiting-list-item--guest';
+                const suffix = player.id === view.self.id ? ' (vous)' : '';
+                const subtitle = player.isHost
+                    ? 'Controle des reglages et lancement de la partie.'
+                    : 'Connecte a la session locale.';
+
+                return `
+                    <div class="waiting-list-item ${modifier}">
+                        <div class="waiting-item-title">${escapeHtml(player.name)}${suffix}${player.isHost ? ' (hote)' : ''}</div>
+                        <div class="waiting-item-subtitle">${subtitle}</div>
+                    </div>
+                `;
+            }).join('');
+
+            const missingPlayers = Math.max(0, view.settings.players - view.playerCount);
+            const helperMessage = view.isHost
+                ? (missingPlayers === 0
+                    ? 'Tous les joueurs sont connectes. Tu peux lancer la partie.'
+                    : `Encore ${missingPlayers} joueur(s) a connecter avant le lancement.`)
+                : `En attente du lancement par l'hote. Joueurs connectes : ${view.playerCount}/${view.settings.players}.`;
+            const actionButtons = view.isHost
+                ? `
+                    <button id="launchOnlineGameBtn" type="button" ${view.canStart ? '' : 'disabled style="opacity:0.55;cursor:not-allowed;"'}>Lancer la partie</button>
+                    <button id="leaveOnlineSessionBtn" type="button" class="button-secondary">Quitter</button>
+                `
+                : `
+                    <button type="button" disabled style="opacity:0.55;cursor:not-allowed;">Lancement reserve a l'hote</button>
+                    <button id="leaveOnlineSessionBtn" type="button" class="button-secondary">Quitter</button>
+                `;
+
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Salle d'attente</h2>
+                <div class="waiting-layout">
+                    <div class="waiting-stage">
+                        <div class="waiting-side waiting-side--players">
+                            <div class="waiting-panel">
+                                <div class="waiting-panel-title">Joueurs connectes</div>
+                                <div class="waiting-list">
+                                    ${playersBlock}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="waiting-main">
+                            ${renderWaitingRoomRoleCard(view.isHost, view.self.name)}
+                            <div class="waiting-code-card">
+                                <p class="waiting-code-text">Partage ce code ou le lien local pour que les autres joueurs rejoignent la session.</p>
+                                <div class="waiting-code-block">${view.code}</div>
+                            </div>
+                            <div class="waiting-action-row">
+                                <button id="copySessionCodeBtn" type="button">Copier le code</button>
+                                <button id="shareSessionCodeBtn" type="button">Partager</button>
+                            </div>
+                            <div class="waiting-action-row">
+                                ${actionButtons}
+                            </div>
+                            <p class="waiting-note waiting-note--primary">${helperMessage}</p>
+                            <p class="waiting-note waiting-note--secondary">Tous les joueurs doivent ouvrir le jeu depuis ce serveur local pour rester synchronises.</p>
+                        </div>
+                        <div class="waiting-side waiting-side--settings">
+                            ${renderSessionSettingsCard(view.settings, view.isHost)}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('copySessionCodeBtn').addEventListener('click', async function() {
+                try {
+                    await navigator.clipboard.writeText(view.code);
+                    showToast('Code de session copie.');
+                } catch (error) {
+                    showCopyFallbackDialog('Code de session', 'Copie ce code pour le partager aux autres joueurs.', view.code);
+                }
+            });
+            document.getElementById('shareSessionCodeBtn').addEventListener('click', function() {
+                showShareSessionDialog(view.code);
+            });
+            document.getElementById('leaveOnlineSessionBtn').addEventListener('click', leaveOnlineSession);
+
+            if (view.isHost) {
+                const rangeInput = document.getElementById('sessionPlayersRange');
+                const playersValue = document.getElementById('sessionPlayersValue');
+                const mrWhiteCheckbox = document.getElementById('sessionMrWhiteCheckbox');
+                const undercoverCheckbox = document.getElementById('sessionUndercoverCheckbox');
+
+                rangeInput.addEventListener('input', function() {
+                    playersValue.textContent = this.value;
+                });
+                rangeInput.addEventListener('change', async function() {
+                    try {
+                        await performOnlineAction('/api/session/settings', {
+                            settings: {
+                                players: parseInt(this.value, 10),
+                                mrWhite: mrWhiteCheckbox.checked,
+                                undercover: undercoverCheckbox.checked
+                            }
+                        });
+                        await refreshOnlineSession(true);
+                    } catch (error) {
+                        showInfoDialog('Parametres invalides', escapeHtml(error.message));
+                        await refreshOnlineSession(true);
+                    }
+                });
+
+                async function submitRoleSettings() {
+                    try {
+                        await performOnlineAction('/api/session/settings', {
+                            settings: {
+                                players: parseInt(rangeInput.value, 10),
+                                mrWhite: mrWhiteCheckbox.checked,
+                                undercover: undercoverCheckbox.checked
+                            }
+                        });
+                        await refreshOnlineSession(true);
+                    } catch (error) {
+                        showInfoDialog('Parametres invalides', escapeHtml(error.message));
+                        await refreshOnlineSession(true);
+                    }
+                }
+
+                mrWhiteCheckbox.addEventListener('change', submitRoleSettings);
+                undercoverCheckbox.addEventListener('change', submitRoleSettings);
+
+                const launchBtn = document.getElementById('launchOnlineGameBtn');
+                if (launchBtn) {
+                    launchBtn.addEventListener('click', async function() {
+                        try {
+                            await performOnlineAction('/api/session/start');
+                            await refreshOnlineSession(true);
+                        } catch (error) {
+                            showInfoDialog('Impossible de lancer la partie', escapeHtml(error.message));
+                        }
+                    });
+                }
+            }
+        }
+
+        function renderOnlineSecretScreen(view) {
+            const secret = view.secret;
+            const message = secret.role === 'mrwhite'
+                ? `<b>Force a toi MrWhite !</b><br><i>Tu n'as pas de mot.</i>`
+                : `Ton mot : <b>${escapeHtml(secret.word)}</b>`;
+            const waitingMessage = view.allSecretsAcknowledged
+                ? 'Tous les joueurs ont memorise leur mot. La partie passe au tour des mots.'
+                : `${view.acknowledgedCount}/${view.playerCount} joueur(s) ont memorise leur mot.`;
+            const buttonHtml = secret.acknowledged
+                ? `<button type="button" class="button-secondary" disabled style="opacity:0.7;cursor:not-allowed;">Mot memorise</button>`
+                : `<button id="ackSecretBtn" type="button">J'ai memorise</button>`;
+
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Carte secrete</h2>
+                <div style="width:min(100%,540px);padding:0 24px;z-index:2;">
+                    <div class="waiting-role-card waiting-role-card--host" style="margin:0 auto 18px;">
+                        <div class="waiting-role-badge">${escapeHtml(view.self.name)}</div>
+                        <div class="waiting-role-title">Memorise ton information</div>
+                        <div class="dialog-word" style="margin:18px 0;">${message}</div>
+                        <p class="waiting-role-text">${waitingMessage}</p>
+                    </div>
+                    <div class="waiting-action-row">
+                        ${buttonHtml}
+                        <button id="leaveOnlineSecretBtn" type="button" class="button-secondary">Quitter</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('leaveOnlineSecretBtn').addEventListener('click', leaveOnlineSession);
+            const ackBtn = document.getElementById('ackSecretBtn');
+            if (ackBtn) {
+                ackBtn.addEventListener('click', async function() {
+                    try {
+                        await performOnlineAction('/api/session/ack-secret');
+                        await refreshOnlineSession(true);
+                    } catch (error) {
+                        showInfoDialog('Impossible de valider', escapeHtml(error.message));
+                    }
+                });
+            }
+        }
+
+        function renderOnlineClueScreen(view) {
+            const cluesHtml = view.players.map((player) => {
+                const submittedClue = view.clues.find((entry) => entry.playerId === player.id);
+                let statusLabel = '<span style="opacity:0.7;">En attente</span>';
+
+                if (submittedClue) {
+                    statusLabel = `<span style="font-weight:bold;color:#fff;">${escapeHtml(submittedClue.text)}</span>`;
+                } else if (view.status === 'clues' && view.activePlayerId === player.id) {
+                    statusLabel = `<span style="color:#ffd180;">${escapeHtml(player.name)} choisit son mot...</span>`;
+                }
+
+                return `
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border-radius:12px;background:#3a3a3a;">
+                        <span style="font-size:1rem;color:#fff;">${escapeHtml(player.name)}</span>
+                        <span style="font-size:0.98rem;text-align:right;">${statusLabel}</span>
+                    </div>
+                `;
+            }).join('');
+
+            const turnStatus = view.status === 'discussion'
+                ? 'Tous les mots ont ete proposes. Discutez ensemble puis identifiez les roles en vrai. La phase de vote synchronisee viendra ensuite.'
+                : (view.yourTurn
+                    ? 'Cest ton tour : propose un mot ou un indice court.'
+                    : `${view.activePlayerName} choisit son mot...`);
+
+            const clueForm = view.status === 'clues' && view.yourTurn
+                ? `
+                    <div class="waiting-panel" style="width:min(100%,560px);">
+                        <div class="waiting-panel-title">Ton tour</div>
+                        <input id="onlineClueInput" class="dialog-input" type="text" maxlength="24" placeholder="Entre ton mot">
+                        <div id="onlineClueError" class="dialog-error" style="display:none;"></div>
+                        <div class="waiting-action-row">
+                            <button id="submitOnlineClueBtn" type="button">Valider le mot</button>
+                        </div>
+                    </div>
+                `
+                : '';
+
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Partie en ligne</h2>
+                <div style="width:min(100%,760px);padding:0 24px;display:flex;flex-direction:column;align-items:center;gap:22px;z-index:2;">
+                    <div class="waiting-panel" style="width:min(100%,760px);">
+                        <div class="waiting-panel-title">${view.status === 'discussion' ? 'Discussion' : 'Tour des mots'}</div>
+                        <div style="font-size:1.05rem;line-height:1.5;color:#f1f1f1;">${turnStatus}</div>
+                    </div>
+                    ${clueForm}
+                    <div class="waiting-panel" style="width:min(100%,760px);">
+                        <div class="waiting-panel-title">Mots proposes</div>
+                        <div class="waiting-list">
+                            ${cluesHtml}
+                        </div>
+                    </div>
+                    <div class="waiting-action-row">
+                        <button id="leaveOnlineClueBtn" type="button" class="button-secondary">Quitter</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('leaveOnlineClueBtn').addEventListener('click', leaveOnlineSession);
+
+            const input = document.getElementById('onlineClueInput');
+            const submitBtn = document.getElementById('submitOnlineClueBtn');
+            const errorBox = document.getElementById('onlineClueError');
+
+            if (input && submitBtn && errorBox) {
+                input.focus();
+                input.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        submitOnlineClue();
+                    }
+                });
+                submitBtn.addEventListener('click', submitOnlineClue);
+
+                async function submitOnlineClue() {
+                    const text = input.value.trim().substring(0, 24);
+                    if (!text) {
+                        errorBox.textContent = 'Entre un mot avant de valider.';
+                        errorBox.style.display = 'block';
+                        input.focus();
+                        return;
+                    }
+
+                    try {
+                        await performOnlineAction('/api/session/submit-clue', { text });
+                        await refreshOnlineSession(true);
+                    } catch (error) {
+                        errorBox.textContent = error.message;
+                        errorBox.style.display = 'block';
+                    }
+                }
+            }
+        }
+
         function showLocalSetupScreen(settings = getDefaultSessionSettings()) {
+            stopOnlineSessionPolling();
+            clearOnlineSessionAuth();
             sessionState = null;
             localGameSettings = normalizeSessionSettings(settings);
 
