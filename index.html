@@ -510,6 +510,7 @@
             const joinBtn = document.getElementById('joinSessionBtn');
             const sharedSessionCode = getSessionCodeFromUrl();
             const savedOnlineAuth = loadOnlineSessionAuth();
+            captureCurrentPublicShareBaseUrl();
             if (createBtn) {
                 createBtn.addEventListener('click', function() {
                     showCreateSessionDialog();
@@ -546,6 +547,7 @@
             lastStatus: null
         };
         const ONLINE_AUTH_STORAGE_KEY = 'undercover_online_auth';
+        const PUBLIC_SHARE_URL_STORAGE_KEY = 'undercover_public_share_url';
 
         function getDefaultSessionSettings() {
             return {
@@ -813,7 +815,8 @@
         }
 
         function getSessionShareUrl(code) {
-            const url = new URL(window.location.href);
+            const baseUrl = getPreferredShareBaseUrl();
+            const url = new URL(window.location.pathname || '/', baseUrl || window.location.href);
             const settings = normalizeSessionSettings(
                 sessionState && sessionState.code === code
                     ? sessionState.settings
@@ -824,6 +827,99 @@
             url.searchParams.set('mrWhite', settings.mrWhite ? '1' : '0');
             url.searchParams.set('undercover', settings.undercover ? '1' : '0');
             return url.toString();
+        }
+
+        function isLocalHostname(hostname) {
+            const value = String(hostname || '').trim().toLowerCase();
+            if (!value) return true;
+            if (value === 'localhost' || value === '127.0.0.1' || value === '::1') {
+                return true;
+            }
+            if (/^10\./.test(value) || /^192\.168\./.test(value)) {
+                return true;
+            }
+
+            const privateRange = value.match(/^172\.(\d{1,2})\./);
+            if (privateRange) {
+                const secondOctet = Number(privateRange[1]);
+                if (secondOctet >= 16 && secondOctet <= 31) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function normalizePublicShareUrl(value) {
+            if (!value) return '';
+
+            try {
+                const url = new URL(String(value).trim());
+                if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+                    return '';
+                }
+
+                return url.origin;
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function loadPublicShareBaseUrl() {
+            try {
+                return normalizePublicShareUrl(window.localStorage.getItem(PUBLIC_SHARE_URL_STORAGE_KEY));
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function savePublicShareBaseUrl(value) {
+            const normalizedValue = normalizePublicShareUrl(value);
+
+            if (!normalizedValue) {
+                window.localStorage.removeItem(PUBLIC_SHARE_URL_STORAGE_KEY);
+                return '';
+            }
+
+            window.localStorage.setItem(PUBLIC_SHARE_URL_STORAGE_KEY, normalizedValue);
+            return normalizedValue;
+        }
+
+        function getCurrentShareBaseUrl() {
+            if (!isServedByNodeServer()) return '';
+            return normalizePublicShareUrl(window.location.origin);
+        }
+
+        function captureCurrentPublicShareBaseUrl() {
+            const currentBaseUrl = getCurrentShareBaseUrl();
+            if (!currentBaseUrl) return loadPublicShareBaseUrl();
+
+            try {
+                const hostname = new URL(currentBaseUrl).hostname;
+                if (!isLocalHostname(hostname)) {
+                    return savePublicShareBaseUrl(currentBaseUrl);
+                }
+            } catch (error) {
+                return loadPublicShareBaseUrl();
+            }
+
+            return loadPublicShareBaseUrl();
+        }
+
+        function getPreferredShareBaseUrl() {
+            const currentBaseUrl = getCurrentShareBaseUrl();
+            if (currentBaseUrl) {
+                try {
+                    const hostname = new URL(currentBaseUrl).hostname;
+                    if (!isLocalHostname(hostname)) {
+                        return currentBaseUrl;
+                    }
+                } catch (error) {
+                    return currentBaseUrl;
+                }
+            }
+
+            return loadPublicShareBaseUrl() || currentBaseUrl;
         }
 
         function getSessionCodeFromUrl() {
@@ -989,12 +1085,80 @@
             window.location.href = window.location.pathname;
         }
 
+        function showPublicShareUrlDialog() {
+            const currentValue = loadPublicShareBaseUrl() || '';
+            const currentOrigin = getCurrentShareBaseUrl();
+            const detectedPublicOrigin = currentOrigin && !isLocalHostname(new URL(currentOrigin).hostname)
+                ? currentOrigin
+                : '';
+
+            const overlay = createDialog(`
+                <div class="dialog-kicker">URL publique</div>
+                <h3>Partager avec Cloudflare</h3>
+                <p>Colle ici ton lien <b>trycloudflare.com</b>. Il sera ensuite utilise pour le QR code et pour le lien a copier dans Discord.</p>
+                <input id="publicShareUrlInput" class="dialog-input" type="text" placeholder="https://xxxxx.trycloudflare.com" value="${escapeHtml(currentValue || detectedPublicOrigin)}">
+                <div id="publicShareUrlError" class="dialog-error" style="display:none;"></div>
+                <div class="dialog-help">Si tu ouvres deja le jeu via le lien Cloudflare, il sera retenu automatiquement.</div>
+                <div class="dialog-actions">
+                    <button id="savePublicShareUrlBtn" type="button">Enregistrer</button>
+                    <button id="clearPublicShareUrlBtn" type="button" class="button-secondary">Effacer</button>
+                    <button id="closePublicShareUrlBtn" type="button" class="button-secondary">Fermer</button>
+                </div>
+            `, true);
+
+            const input = document.getElementById('publicShareUrlInput');
+            const errorBox = document.getElementById('publicShareUrlError');
+            input.focus();
+            input.select();
+
+            document.getElementById('savePublicShareUrlBtn').addEventListener('click', function() {
+                const normalizedValue = savePublicShareBaseUrl(input.value);
+                if (!normalizedValue) {
+                    errorBox.textContent = 'Entre une URL valide du type https://xxxxx.trycloudflare.com';
+                    errorBox.style.display = 'block';
+                    input.focus();
+                    return;
+                }
+
+                closeDialog(overlay);
+                showToast('URL publique enregistree.');
+                if (onlineSessionRuntime.auth) {
+                    refreshOnlineSession(true);
+                }
+            });
+
+            document.getElementById('clearPublicShareUrlBtn').addEventListener('click', function() {
+                savePublicShareBaseUrl('');
+                closeDialog(overlay);
+                showToast('URL publique effacee.');
+                if (onlineSessionRuntime.auth) {
+                    refreshOnlineSession(true);
+                }
+            });
+
+            document.getElementById('closePublicShareUrlBtn').addEventListener('click', function() {
+                closeDialog(overlay);
+            });
+        }
+
         function showShareSessionDialog(code) {
             const shareUrl = getSessionShareUrl(code);
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(shareUrl)}`;
-            const localFileNote = window.location.protocol === 'file:'
-                ? `Le lien genere actuellement une adresse locale <b>file://</b>. Pour qu'il fonctionne sur un autre appareil via QR code ou Discord, ouvre plutot la page via un serveur local ou un hebergement en ligne.`
-                : `Scanne le QR code ou copie le lien ci-dessous pour l'envoyer sur Discord, WhatsApp ou ailleurs.`;
+            const shareBaseUrl = getPreferredShareBaseUrl();
+            let localFileNote = `Scanne le QR code ou copie le lien ci-dessous pour l'envoyer sur Discord, WhatsApp ou ailleurs.`;
+
+            if (window.location.protocol === 'file:') {
+                localFileNote = `Le lien genere actuellement une adresse locale <b>file://</b>. Pour qu'il fonctionne sur un autre appareil via QR code ou Discord, ouvre plutot la page via un serveur local ou un hebergement en ligne.`;
+            } else if (shareBaseUrl) {
+                try {
+                    const hostname = new URL(shareBaseUrl).hostname;
+                    if (isLocalHostname(hostname)) {
+                        localFileNote = `Le lien utilise encore une adresse locale. Renseigne ton URL <b>trycloudflare.com</b> dans la salle d'attente pour obtenir un QR code partageable sur Internet.`;
+                    }
+                } catch (error) {
+                    localFileNote = `Le lien utilise encore une adresse locale. Renseigne ton URL <b>trycloudflare.com</b> dans la salle d'attente pour obtenir un QR code partageable sur Internet.`;
+                }
+            }
 
             const overlay = createDialog(`
                 <div class="dialog-kicker">Partager la session</div>
@@ -2133,6 +2297,23 @@
                     ? `Le salon a atteint sa capacite maximale de ${view.settings.players} joueur(s). Tu peux lancer la partie.`
                     : `Le salon peut accueillir jusqu'a ${view.settings.players} joueur(s). Encore ${missingPlayers} joueur(s) a connecter avant le lancement.`)
                 : `En attente du lancement par l'hote. Joueurs connectes : ${view.playerCount}/${view.settings.players}.`;
+            const shareBaseUrl = captureCurrentPublicShareBaseUrl() || getPreferredShareBaseUrl();
+            const shareHostLabel = shareBaseUrl
+                ? (() => {
+                    try {
+                        return new URL(shareBaseUrl).host;
+                    } catch (error) {
+                        return shareBaseUrl;
+                    }
+                })()
+                : 'localhost';
+            const shareBaseIsLocal = !shareBaseUrl || (() => {
+                try {
+                    return isLocalHostname(new URL(shareBaseUrl).hostname);
+                } catch (error) {
+                    return true;
+                }
+            })();
             const actionButtons = view.isHost
                 ? `
                     <button id="launchOnlineGameBtn" type="button" ${view.canStart ? '' : 'disabled style="opacity:0.55;cursor:not-allowed;"'}>Lancer la partie</button>
@@ -2176,11 +2357,16 @@
                                 <button id="copySessionCodeBtn" type="button">Copier le code</button>
                                 <button id="shareSessionCodeBtn" type="button">Partager</button>
                             </div>
+                            ${view.isHost ? `
+                                <div class="waiting-action-row">
+                                    <button id="configurePublicShareUrlBtn" type="button" class="button-secondary">${shareBaseIsLocal ? 'Definir l URL publique' : 'Modifier l URL publique'}</button>
+                                </div>
+                            ` : ''}
                             <div class="waiting-action-row">
                                 ${actionButtons}
                             </div>
                             <p class="waiting-note waiting-note--primary">${helperMessage}</p>
-                            <p class="waiting-note waiting-note--secondary">Tous les joueurs doivent ouvrir le jeu depuis ce serveur local pour rester synchronises.</p>
+                            <p class="waiting-note waiting-note--secondary">Base de partage actuelle : <strong>${escapeHtml(shareHostLabel)}</strong>${shareBaseIsLocal ? ' (locale)' : ' (publique)'}</p>
                         </div>
                         <div class="waiting-side waiting-side--settings">
                             ${renderSessionSettingsCard(view.settings, view.isHost)}
@@ -2201,6 +2387,11 @@
                 showShareSessionDialog(view.code);
             });
             document.getElementById('leaveOnlineSessionBtn').addEventListener('click', leaveOnlineSession);
+
+            const configurePublicShareUrlBtn = document.getElementById('configurePublicShareUrlBtn');
+            if (configurePublicShareUrlBtn) {
+                configurePublicShareUrlBtn.addEventListener('click', showPublicShareUrlDialog);
+            }
 
             if (view.isHost) {
                 const rangeInput = document.getElementById('sessionPlayersRange');
