@@ -393,10 +393,10 @@
             max-height: calc(100svh - 64px);
             margin: 8px auto 0;
             display: grid;
-            grid-template-columns: minmax(0, 1fr);
-            gap: 28px;
-            justify-items: center;
-            align-items: start;
+            grid-template-columns: minmax(200px, 240px) minmax(0, 760px) minmax(200px, 240px);
+            gap: 16px;
+            justify-items: stretch;
+            align-items: center;
         }
         .home-card {
             position: relative;
@@ -408,7 +408,7 @@
             overflow: hidden;
         }
         .home-copy {
-            width: min(100%, 780px);
+            width: 100%;
             max-height: 100%;
             padding: 40px 42px 36px;
             display: flex;
@@ -416,6 +416,7 @@
             gap: 18px;
             align-items: center;
             text-align: center;
+            grid-column: 2;
         }
         .home-copy::before,
         .home-side-card::before {
@@ -525,51 +526,55 @@
             background: rgba(255, 255, 255, 0.11);
             box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2);
         }
-        .home-copy-foot {
-            margin-top: 4px;
-            font-size: 0.95rem;
-            color: rgba(255, 255, 255, 0.58);
-        }
         .home-side-card {
-            width: min(100%, 680px);
+            width: 100%;
             max-height: 100%;
-            padding: 28px;
+            padding: 20px 18px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 14px;
+            justify-content: center;
+        }
+        .home-side-card--left {
+            grid-column: 1;
+        }
+        .home-side-card--right {
+            grid-column: 3;
         }
         .home-side-top {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             align-items: flex-start;
-            gap: 16px;
+            gap: 10px;
         }
         .home-side-title {
             margin: 0;
-            font-size: 1.5rem;
+            font-size: 1.14rem;
+            line-height: 1.25;
         }
         .home-side-subtitle {
-            margin: 8px 0 0;
-            line-height: 1.6;
-            color: rgba(255, 255, 255, 0.72);
+            margin: 0;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.94rem;
         }
         .home-side-badge {
-            padding: 8px 12px;
+            width: fit-content;
+            padding: 7px 11px;
             border-radius: 999px;
             background: rgba(95, 192, 174, 0.12);
             color: #8ad6c5;
             font-size: 0.82rem;
             letter-spacing: 0.08rem;
             text-transform: uppercase;
-            white-space: nowrap;
         }
         .home-side-list {
             display: grid;
-            gap: 12px;
+            gap: 10px;
         }
         .home-side-item {
-            padding: 14px 16px;
-            border-radius: 18px;
+            padding: 12px 14px;
+            border-radius: 16px;
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
@@ -606,14 +611,12 @@
             background: var(--chip-color, #f6c97e);
             box-shadow: 0 0 10px var(--chip-color, #f6c97e);
         }
-        .home-side-note {
-            margin: 0;
-            padding: 16px 18px;
-            border-radius: 18px;
-            background: rgba(255, 184, 96, 0.08);
-            border: 1px solid rgba(255, 206, 142, 0.12);
-            line-height: 1.6;
-            color: rgba(255, 246, 229, 0.76);
+        .home-side-grid-note {
+            display: grid;
+            gap: 8px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 0.94rem;
+            line-height: 1.45;
         }
         @keyframes homeGridDrift {
             from {
@@ -1350,10 +1353,20 @@
         @media (max-width: 980px) {
             .home-shell {
                 width: calc(100% - 32px);
+                grid-template-columns: 1fr;
+                justify-items: center;
             }
             .home-copy,
             .home-side-card {
                 padding: 26px 22px;
+            }
+            .home-copy,
+            .home-side-card--left,
+            .home-side-card--right {
+                grid-column: auto;
+            }
+            .home-copy {
+                order: -1;
             }
             .home-title-row {
                 align-items: flex-start;
@@ -1523,6 +1536,23 @@
     </div>
 
     <main class="home-shell">
+        <aside class="home-card home-side-card home-side-card--left">
+            <div class="home-side-top">
+                <div class="home-side-badge">Jouer</div>
+                <h2 class="home-side-title">Deux façons d'entrer dans la partie</h2>
+                <p class="home-side-subtitle">Choisis vite ton format, puis lance la manche.</p>
+            </div>
+            <div class="home-side-list">
+                <div class="home-side-item">
+                    <strong>Local</strong>
+                    <span>Un seul ecran, les cartes passent de main en main.</span>
+                </div>
+                <div class="home-side-item">
+                    <strong>En ligne</strong>
+                    <span>Une session, un pseudo, chacun sur son appareil.</span>
+                </div>
+            </div>
+        </aside>
         <section class="home-card home-copy">
             <div class="home-kicker">Enquete de salon</div>
             <div class="home-title-row">
@@ -1542,7 +1572,7 @@
                 </div>
                 <h1 class="home-title"><span class="home-title-accent">Qui ment le mieux ?</span>Undercover</h1>
             </div>
-            <p class="home-subtitle">Un jeu de deduction sociale sombre, elegant et un peu animal. Observe les indices, piste le caméléon, repere qui se fond dans le groupe avant qu’il ne retourne la table.</p>
+            <p class="home-subtitle">Observe les indices, piste le caméléon et trouve qui se fond dans le groupe avant que le salon ne se retourne contre toi.</p>
             <div class="home-tags">
                 <span class="home-tag">Ambiance detective</span>
                 <span class="home-tag">Bluff et intuition</span>
@@ -1553,31 +1583,13 @@
                 <button id="joinSessionBtn" class="home-button home-button--ghost">Rejoindre une session</button>
             </div>
             <button id="startBtn" class="home-button home-button--ghost">Commencer en local</button>
-            <p class="home-copy-foot">Le fond reste leger et anime directement dans le navigateur pour garder une page d’accueil vivante sans ralentir le jeu.</p>
         </section>
 
-        <aside class="home-card home-side-card">
+        <aside class="home-card home-side-card home-side-card--right">
             <div class="home-side-top">
-                <div>
-                    <h2 class="home-side-title">Dossier du salon</h2>
-                    <p class="home-side-subtitle">Chaque partie ressemble a une petite scene de crime sociale : des mots, des regards, et un imposteur qui change de peau.</p>
-                </div>
-                <div class="home-side-badge">Caméléon</div>
-            </div>
-
-            <div class="home-side-list">
-                <div class="home-side-item">
-                    <strong>Observe les cartes</strong>
-                    <span>Les tours revelent juste assez d’indices pour nourrir le doute, jamais assez pour rassurer tout le monde.</span>
-                </div>
-                <div class="home-side-item">
-                    <strong>Debats en direct</strong>
-                    <span>Le salon devient une salle d’interrogatoire ou chaque mot peut innocenter ou condamner.</span>
-                </div>
-                <div class="home-side-item">
-                    <strong>Theme animal</strong>
-                    <span>Le caméléon mene la chasse, pendant que les silhouettes autour rappellent les temoins, les traces et les predateurs.</span>
-                </div>
+                <div class="home-side-badge">Roles</div>
+                <h2 class="home-side-title">Trois présences, une seule vérité</h2>
+                <p class="home-side-subtitle">Lis la table, repere l'imitation et protege le bon mot.</p>
             </div>
 
             <div class="home-side-roles">
@@ -1586,7 +1598,11 @@
                 <span class="home-role-chip" style="--chip-color:#8fc3ff;">Mr. White</span>
             </div>
 
-            <p class="home-side-note">L’emblème du jeu est maintenant le caméléon : discret, changeant, impossible a lire au premier regard. C’est aussi l’icône de l’onglet du site.</p>
+            <div class="home-side-grid-note">
+                <div>Le civil suit le vrai mot.</div>
+                <div>L'Undercover imite sans se trahir.</div>
+                <div>Mr. White improvise et brouille les pistes.</div>
+            </div>
         </aside>
     </main>
 
@@ -2256,6 +2272,25 @@
 
             clearOnlineSessionAuth();
             window.location.href = window.location.pathname;
+        }
+
+        function bindReturnToLobbyButton(buttonId, options = {}) {
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+
+            const title = options.title || 'Retour au salon';
+            const message = options.message || 'Revenir au salon avec les memes joueurs et les memes reglages ?';
+
+            button.addEventListener('click', function() {
+                showConfirmDialog(title, message, 'Retour au salon', async function() {
+                    try {
+                        await performOnlineAction('/api/session/return-to-lobby', {});
+                        await refreshOnlineSession(true);
+                    } catch (error) {
+                        showInfoDialog('Impossible de revenir au salon', escapeHtml(error.message));
+                    }
+                });
+            });
         }
 
         function showPublicShareUrlDialog() {
@@ -3693,12 +3728,16 @@
                     </div>
                     <div class="waiting-action-row">
                         ${buttonHtml}
+                        ${view.isHost ? '<button id="returnOnlineSecretLobbyBtn" type="button" class="button-secondary">Retour au salon</button>' : ''}
                         <button id="leaveOnlineSecretBtn" type="button" class="button-secondary">Quitter</button>
                     </div>
                 </div>
             `;
 
             document.getElementById('leaveOnlineSecretBtn').addEventListener('click', leaveOnlineSession);
+            bindReturnToLobbyButton('returnOnlineSecretLobbyBtn', {
+                message: 'Revenir au salon et interrompre la partie en cours ?'
+            });
             const ackBtn = document.getElementById('ackSecretBtn');
             if (ackBtn) {
                 ackBtn.addEventListener('click', async function() {
@@ -3856,6 +3895,7 @@
                             <p style="margin:0;line-height:1.55;opacity:0.78;">Chaque carte affiche d'abord le nom de son joueur. Quand un mot est valide, la carte se retourne et le nom du joueur apparait au-dessus.</p>
                         </div>
                         <div class="waiting-action-row" style="justify-content:flex-start;">
+                            ${view.isHost ? '<button id="returnOnlineClueLobbyBtn" type="button" class="button-secondary">Retour au salon</button>' : ''}
                             <button id="leaveOnlineClueBtn" type="button" class="button-secondary">Quitter</button>
                         </div>
                     </div>
@@ -3863,6 +3903,9 @@
             `;
 
             document.getElementById('leaveOnlineClueBtn').addEventListener('click', leaveOnlineSession);
+            bindReturnToLobbyButton('returnOnlineClueLobbyBtn', {
+                message: 'Revenir au salon et interrompre la partie en cours ?'
+            });
 
             const input = document.getElementById('onlineClueInput');
             const submitBtn = document.getElementById('submitOnlineClueBtn');
@@ -4065,6 +4108,7 @@
                             ${chatComposer}
                         </div>
                         <div class="waiting-action-row" style="justify-content:flex-start;">
+                            ${view.isHost ? '<button id="returnOnlineDiscussionLobbyBtn" type="button" class="button-secondary">Retour au salon</button>' : ''}
                             <button id="leaveOnlineDiscussionBtn" type="button" class="button-secondary">Quitter</button>
                         </div>
                     </div>
@@ -4072,6 +4116,9 @@
             `;
 
             document.getElementById('leaveOnlineDiscussionBtn').addEventListener('click', leaveOnlineSession);
+            bindReturnToLobbyButton('returnOnlineDiscussionLobbyBtn', {
+                message: 'Revenir au salon et interrompre la partie en cours ?'
+            });
 
             const chatInput = document.getElementById('onlineChatInput');
             const chatError = document.getElementById('onlineChatError');
@@ -4206,11 +4253,15 @@
                         </div>
                     </div>
                     <div class="waiting-action-row">
+                        ${view.isHost ? '<button id="returnOnlineFinishedLobbyBtn" type="button">Retour au salon</button>' : ''}
                         <button id="leaveOnlineFinishedBtn" type="button" class="button-secondary">Quitter la session</button>
                     </div>
                 </div>
             `;
 
+            bindReturnToLobbyButton('returnOnlineFinishedLobbyBtn', {
+                message: 'Revenir au salon avec les memes joueurs et les memes reglages ?'
+            });
             document.getElementById('leaveOnlineFinishedBtn').addEventListener('click', leaveOnlineSession);
         }
 

@@ -370,6 +370,20 @@ function finishSession(session, summary, winner) {
     session.winner = winner;
 }
 
+function returnSessionToWaiting(session) {
+    session.status = 'waiting';
+    session.assignments = null;
+    session.alivePlayerIds = session.players.map((entry) => entry.id);
+    session.secretAcknowledged = new Set();
+    session.clues = [];
+    session.activeClueIndex = 0;
+    session.roundNumber = 1;
+    session.discussionMessages = [];
+    session.votes = {};
+    session.lastRoundSummary = null;
+    session.winner = null;
+}
+
 function resolveDiscussion(session) {
     const alivePlayers = getAlivePlayers(session);
     const eligibleVoterCount = alivePlayers.length;
@@ -815,6 +829,36 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         session.lastRoundSummary = null;
         session.winner = null;
         session.status = 'secrets';
+        updateSessionRevision(session);
+        sendJson(res, 200, buildSessionView(session, player.id));
+        return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/session/return-to-lobby') {
+        const body = await readJsonBody(req);
+        const session = ensureSession(body.code);
+        if (!session) {
+            sendError(res, 404, 'Cette session est introuvable.');
+            return;
+        }
+
+        const player = ensurePlayer(session, body.playerId);
+        if (!player) {
+            sendError(res, 403, 'Joueur non reconnu pour cette session.');
+            return;
+        }
+
+        if (session.hostPlayerId !== player.id) {
+            sendError(res, 403, "Seul l hote peut renvoyer tout le monde au salon.");
+            return;
+        }
+
+        if (session.status === 'waiting') {
+            sendJson(res, 200, buildSessionView(session, player.id));
+            return;
+        }
+
+        returnSessionToWaiting(session);
         updateSessionRevision(session);
         sendJson(res, 200, buildSessionView(session, player.id));
         return;
