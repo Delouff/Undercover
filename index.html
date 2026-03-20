@@ -437,6 +437,67 @@
         .waiting-note--secondary {
             opacity: 0.68;
         }
+        .online-discussion-layout {
+            width: min(100%, 1180px);
+            padding: 0 24px;
+            display: grid;
+            grid-template-columns: minmax(250px, 320px) minmax(0, 1fr) minmax(340px, 420px);
+            gap: 22px;
+            align-items: start;
+            z-index: 2;
+        }
+        .online-discussion-column {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            min-width: 0;
+        }
+        .online-vote-panel {
+            align-self: stretch;
+        }
+        .online-chat-panel {
+            min-height: 620px;
+            display: flex;
+            flex-direction: column;
+        }
+        .online-chat-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 360px;
+            max-height: 420px;
+            overflow: auto;
+            padding-right: 4px;
+            margin-bottom: 16px;
+        }
+        .online-chat-composer {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .online-chat-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .online-chat-input {
+            margin-bottom: 0;
+        }
+        .online-char-count {
+            align-self: flex-end;
+            font-size: 0.9rem;
+            opacity: 0.72;
+            white-space: nowrap;
+        }
+        .online-vote-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .online-vote-target {
+            margin-bottom: 0;
+        }
         @media (max-width: 980px) {
             .waiting-stage {
                 grid-template-columns: 1fr;
@@ -454,6 +515,18 @@
             .waiting-role-card,
             .waiting-code-card {
                 width: 100%;
+            }
+            .online-discussion-layout {
+                width: calc(100% - 32px);
+                padding: 0 16px;
+                grid-template-columns: 1fr;
+            }
+            .online-chat-panel {
+                min-height: 0;
+            }
+            .online-chat-feed {
+                min-height: 260px;
+                max-height: 320px;
             }
         }
         @media (max-width: 640px) {
@@ -474,6 +547,13 @@
             .waiting-code-block {
                 font-size: 2rem;
                 letter-spacing: 0.22rem;
+            }
+            .online-chat-input-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .online-char-count {
+                align-self: flex-start;
             }
         }
     </style>
@@ -793,6 +873,27 @@
             });
         }
 
+        function showConfirmDialog(title, message, confirmLabel, onConfirm) {
+            const overlay = createDialog(`
+                <div class="dialog-kicker">Confirmation</div>
+                <h3>${escapeHtml(title)}</h3>
+                <p>${escapeHtml(message)}</p>
+                <div class="dialog-actions">
+                    <button id="confirmDialogConfirmBtn" type="button">${escapeHtml(confirmLabel)}</button>
+                    <button id="confirmDialogCancelBtn" type="button" class="button-secondary">Annuler</button>
+                </div>
+            `);
+
+            document.getElementById('confirmDialogCancelBtn').addEventListener('click', function() {
+                closeDialog(overlay);
+            });
+
+            document.getElementById('confirmDialogConfirmBtn').addEventListener('click', async function() {
+                closeDialog(overlay);
+                await onConfirm();
+            });
+        }
+
         function showCopyFallbackDialog(title, helpText, value) {
             const overlay = createDialog(`
                 <div class="dialog-kicker">Copie manuelle</div>
@@ -1054,7 +1155,11 @@
             } catch (error) {
                 stopOnlineSessionPolling();
                 clearOnlineSessionAuth();
-                showInfoDialog('Session indisponible', `${escapeHtml(error.message)}<br><br>${getServerHelpMessage()}`);
+                const isPlayerRemoved = error.message.includes('ne reconnait pas ce joueur');
+                const helpMessage = isPlayerRemoved
+                    ? 'Tu as quitte cette session ou tu as ete exclu par l hote.'
+                    : `${escapeHtml(error.message)}<br><br>${getServerHelpMessage()}`;
+                showInfoDialog('Session indisponible', helpMessage);
             }
         }
 
@@ -1079,8 +1184,24 @@
             });
         }
 
-        function leaveOnlineSession() {
+        async function leaveOnlineSession() {
             stopOnlineSessionPolling();
+
+            const auth = onlineSessionRuntime.auth;
+            if (auth) {
+                try {
+                    await apiRequest('/api/session/leave', {
+                        method: 'POST',
+                        body: {
+                            code: auth.code,
+                            playerId: auth.playerId
+                        }
+                    });
+                } catch (error) {
+                    console.error(error);
+                }
+            }
+
             clearOnlineSessionAuth();
             window.location.href = window.location.pathname;
         }
@@ -2282,10 +2403,14 @@
                 const subtitle = player.isHost
                     ? 'Controle des reglages et lancement de la partie.'
                     : 'Connecte a la session locale.';
+                const canKick = view.isHost && !player.isHost;
 
                 return `
                     <div class="waiting-list-item ${modifier}">
-                        <div class="waiting-item-title">${escapeHtml(player.name)}${suffix}${player.isHost ? ' (hote)' : ''}</div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                            <div class="waiting-item-title">${escapeHtml(player.name)}${suffix}${player.isHost ? ' (hote)' : ''}</div>
+                            ${canKick ? `<button type="button" class="button-secondary waiting-kick-btn" data-player-id="${escapeHtml(player.id)}" data-player-name="${escapeHtml(player.name)}" style="padding:8px 14px;font-size:0.95rem;">Exclure</button>` : ''}
+                        </div>
                         <div class="waiting-item-subtitle">${subtitle}</div>
                     </div>
                 `;
@@ -2392,6 +2517,30 @@
             if (configurePublicShareUrlBtn) {
                 configurePublicShareUrlBtn.addEventListener('click', showPublicShareUrlDialog);
             }
+
+            document.querySelectorAll('.waiting-kick-btn').forEach((button) => {
+                button.addEventListener('click', function() {
+                    const targetPlayerId = this.getAttribute('data-player-id');
+                    const targetPlayerName = this.getAttribute('data-player-name');
+
+                    showConfirmDialog(
+                        'Exclure un joueur',
+                        `Exclure ${targetPlayerName} de la session ?`,
+                        'Exclure',
+                        async function() {
+                            try {
+                                await performOnlineAction('/api/session/kick', {
+                                    targetPlayerId
+                                });
+                                showToast(`${targetPlayerName} a ete exclu.`);
+                                await refreshOnlineSession(true);
+                            } catch (error) {
+                                showInfoDialog('Impossible d exclure ce joueur', escapeHtml(error.message));
+                            }
+                        }
+                    );
+                });
+            });
 
             if (view.isHost) {
                 const rangeInput = document.getElementById('sessionPlayersRange');
@@ -2707,16 +2856,21 @@
 
             const chatComposer = view.canChat
                 ? `
-                    <div style="display:flex;gap:10px;align-items:flex-start;">
-                        <textarea id="onlineChatInput" class="dialog-input" rows="3" maxlength="220" placeholder="Ecris ton message pour le debat..." style="min-height:92px;resize:vertical;"></textarea>
-                    </div>
-                    <div id="onlineChatError" class="dialog-error" style="display:none;"></div>
-                    <div class="waiting-action-row" style="justify-content:flex-start;">
-                        <button id="sendOnlineChatBtn" type="button">Envoyer</button>
+                    <div class="online-chat-composer">
+                        <div class="online-chat-input-row">
+                            <input id="onlineChatInput" class="dialog-input online-chat-input" type="text" maxlength="100" placeholder="Ecris ton message pour le debat...">
+                            <span id="onlineChatCounter" class="online-char-count">0 / 100</span>
+                        </div>
+                        <div id="onlineChatError" class="dialog-error" style="display:none;"></div>
+                        <div class="waiting-action-row" style="justify-content:flex-start;">
+                            <button id="sendOnlineChatBtn" type="button">Envoyer</button>
+                        </div>
                     </div>
                 `
                 : `
-                    <div style="font-size:0.95rem;line-height:1.55;color:#cfcfcf;">Tu peux lire le debat, mais seuls les joueurs encore en vie peuvent envoyer des messages.</div>
+                    <div class="online-chat-composer">
+                        <div style="font-size:0.95rem;line-height:1.55;color:#cfcfcf;">Tu peux lire le debat, mais seuls les joueurs encore en vie peuvent envoyer des messages.</div>
+                    </div>
                 `;
 
             document.body.innerHTML = `
@@ -2732,9 +2886,9 @@
                     </svg>
                 </div>
                 <h2>Debat du tour ${view.roundNumber}</h2>
-                <div style="width:min(100%,1100px);padding:0 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;align-items:start;z-index:2;">
-                    <div style="display:flex;flex-direction:column;gap:18px;">
-                        <div class="waiting-panel">
+                <div class="online-discussion-layout">
+                    <div class="online-discussion-column">
+                        <div class="waiting-panel online-vote-panel">
                             <div class="waiting-panel-title">Votes</div>
                             <div style="font-size:1rem;line-height:1.5;color:#f1f1f1;margin-bottom:12px;">
                                 ${view.votesSubmittedCount}/${view.eligibleVotersCount} joueur(s) ont vote.
@@ -2745,7 +2899,7 @@
                         </div>
                         ${voteCard}
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:18px;">
+                    <div class="online-discussion-column">
                         ${renderOnlineRoundSummary(view.lastRoundSummary)}
                         <div class="waiting-panel">
                             <div class="waiting-panel-title">Mots du tour</div>
@@ -2753,19 +2907,19 @@
                                 ${cluesHtml}
                             </div>
                         </div>
-                        <div class="waiting-panel">
-                            <div class="waiting-panel-title">Chat du debat</div>
-                            <div style="display:flex;flex-direction:column;gap:10px;max-height:360px;overflow:auto;margin-bottom:14px;">
-                                ${chatMessagesHtml}
-                            </div>
-                            ${chatComposer}
-                        </div>
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:18px;">
+                    <div class="online-discussion-column">
                         <div class="waiting-role-card waiting-role-card--host" style="margin:0;">
                             <div class="waiting-role-badge">Debat</div>
                             <div class="waiting-role-title">Discutez puis votez</div>
                             <p class="waiting-role-text">Le debat se termine automatiquement des que tous les joueurs encore en vie ont vote.</p>
+                        </div>
+                        <div class="waiting-panel online-chat-panel">
+                            <div class="waiting-panel-title">Chat du debat</div>
+                            <div class="online-chat-feed">
+                                ${chatMessagesHtml}
+                            </div>
+                            ${chatComposer}
                         </div>
                         <div class="waiting-panel">
                             <div class="waiting-panel-title">Rappel</div>
@@ -2785,10 +2939,19 @@
             const chatInput = document.getElementById('onlineChatInput');
             const chatError = document.getElementById('onlineChatError');
             const chatButton = document.getElementById('sendOnlineChatBtn');
+            const chatCounter = document.getElementById('onlineChatCounter');
 
-            if (chatInput && chatError && chatButton) {
+            if (chatInput && chatError && chatButton && chatCounter) {
+                function updateChatCounter() {
+                    const length = chatInput.value.length;
+                    chatCounter.textContent = `${length} / 100`;
+                    chatCounter.style.color = length >= 100 ? '#ffb74d' : 'inherit';
+                }
+
+                updateChatCounter();
+                chatInput.addEventListener('input', updateChatCounter);
                 chatInput.addEventListener('keydown', function(event) {
-                    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                    if (event.key === 'Enter') {
                         event.preventDefault();
                         sendChatMessage();
                     }
@@ -2796,7 +2959,7 @@
                 chatButton.addEventListener('click', sendChatMessage);
 
                 async function sendChatMessage() {
-                    const text = chatInput.value.trim().substring(0, 220);
+                    const text = chatInput.value.trim().substring(0, 100);
                     if (!text) {
                         chatError.textContent = 'Entre un message avant de lenvoyer.';
                         chatError.style.display = 'block';
@@ -2807,6 +2970,7 @@
                     try {
                         await performOnlineAction('/api/session/chat', { text });
                         chatInput.value = '';
+                        updateChatCounter();
                         chatError.style.display = 'none';
                         await refreshOnlineSession(true);
                     } catch (error) {

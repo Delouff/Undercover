@@ -74,7 +74,7 @@ function normalizeSettings(settings = {}, fallback = { players: 5, mrWhite: true
 }
 
 function normalizeChatMessage(value) {
-    return String(value || '').replace(/\s+/g, ' ').trim().substring(0, 220);
+    return String(value || '').replace(/\s+/g, ' ').trim().substring(0, 100);
 }
 
 function normalizeVoteRole(value) {
@@ -151,6 +151,85 @@ function buildAssignments(session) {
     session.players.forEach((player, index) => {
         session.assignments[player.id] = shuffledRoles[index];
     });
+}
+
+function removePlayerFromSession(session, playerId) {
+    const playerIndex = session.players.findIndex((entry) => entry.id === playerId);
+    if (playerIndex === -1) {
+        return { removed: false, deleted: false };
+    }
+
+    const [removedPlayer] = session.players.splice(playerIndex, 1);
+
+    if (session.assignments) {
+        delete session.assignments[playerId];
+    }
+
+    session.alivePlayerIds = (session.alivePlayerIds || []).filter((entryId) => entryId !== playerId);
+
+    if (session.secretAcknowledged) {
+        session.secretAcknowledged.delete(playerId);
+    }
+
+    session.clues = (session.clues || []).filter((clue) => clue.playerId !== playerId);
+    delete session.votes[playerId];
+    Object.keys(session.votes || {}).forEach((voterId) => {
+        if (session.votes[voterId]?.targetPlayerId === playerId) {
+            delete session.votes[voterId];
+        }
+    });
+
+    if (session.players.length === 0) {
+        sessions.delete(session.code);
+        return {
+            removed: true,
+            deleted: true,
+            removedPlayer
+        };
+    }
+
+    if (session.hostPlayerId === playerId) {
+        session.hostPlayerId = session.players[0].id;
+    }
+
+    if (session.status === 'secrets') {
+        if (session.secretAcknowledged.size === session.players.length && session.players.length > 0) {
+            session.status = 'clues';
+            session.activeClueIndex = 0;
+        }
+    } else if (session.status === 'clues') {
+        const alivePlayers = getAlivePlayers(session);
+        if (alivePlayers.length === 0) {
+            sessions.delete(session.code);
+            return {
+                removed: true,
+                deleted: true,
+                removedPlayer
+            };
+        }
+
+        if (session.clues.length >= alivePlayers.length) {
+            session.status = 'discussion';
+            session.discussionMessages = [];
+            session.votes = {};
+            session.activeClueIndex = 0;
+        } else {
+            session.activeClueIndex = Math.min(session.clues.length, Math.max(0, alivePlayers.length - 1));
+        }
+    } else if (session.status === 'discussion') {
+        resolveDiscussion(session);
+    } else if (session.status === 'finished') {
+        const winner = determineWinner(session);
+        if (winner) {
+            session.winner = winner;
+        }
+    }
+
+    return {
+        removed: true,
+        deleted: false,
+        removedPlayer
+    };
 }
 
 function ensureSession(sessionCode) {
@@ -590,6 +669,78 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         sendJson(res, 200, buildSessionView(session, playerId));
+        return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/session/leave') {
+        const body = await readJsonBody(req);
+        const session = ensureSession(body.code);
+        if (!session) {
+            sendJson(res, 200, { left: true, deleted: true });
+            return;
+        }
+
+        const player = ensurePlayer(session, body.playerId);
+        if (!player) {
+            sendJson(res, 200, { left: true, deleted: false });
+            return;
+        }
+
+        const removal = removePlayerFromSession(session, player.id);
+        if (!removal.deleted) {
+            updateSessionRevision(session);
+        }
+
+        sendJson(res, 200, {
+            left: true,
+            deleted: removal.deleted
+        });
+        return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/session/kick') {
+        const body = await readJsonBody(req);
+        const session = ensureSession(body.code);
+        if (!session) {
+            sendError(res, 404, 'Cette session est introuvable.');
+            return;
+        }
+
+        const hostPlayer = ensurePlayer(session, body.playerId);
+        if (!hostPlayer) {
+            sendError(res, 403, 'Joueur non reconnu pour cette session.');
+            return;
+        }
+
+        if (session.hostPlayerId !== hostPlayer.id) {
+            sendError(res, 403, "Seul l hote peut exclure un joueur.");
+            return;
+        }
+
+        const targetPlayerId = String(body.targetPlayerId || '').trim();
+        const targetPlayer = ensurePlayer(session, targetPlayerId);
+        if (!targetPlayer) {
+            sendError(res, 404, 'Ce joueur n est plus dans la session.');
+            return;
+        }
+
+        if (targetPlayer.id === hostPlayer.id) {
+            sendError(res, 400, 'L hote ne peut pas s exclure lui-meme.');
+            return;
+        }
+
+        const removal = removePlayerFromSession(session, targetPlayer.id);
+        if (removal.deleted) {
+            sendJson(res, 200, {
+                kickedPlayerId: targetPlayer.id,
+                kickedPlayerName: targetPlayer.name,
+                deleted: true
+            });
+            return;
+        }
+
+        updateSessionRevision(session);
+        sendJson(res, 200, buildSessionView(session, hostPlayer.id));
         return;
     }
 
