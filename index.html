@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Undercover</title>
+    <title>Undercover Online</title>
     <style>
         body {
             display: flex;
@@ -2065,6 +2065,28 @@
             });
         }
 
+        function getOnlineRoleLabel(role) {
+            if (role === 'mrwhite') return 'MrWhite';
+            if (role === 'undercover') return 'Undercover';
+            return 'Civil';
+        }
+
+        function renderOnlineRoundSummary(summary) {
+            if (!summary) return '';
+
+            const accent = summary.type === 'skip'
+                ? '#b9975b'
+                : (summary.voteWasCorrect ? '#4caf50' : '#ff9800');
+
+            return `
+                <div class="waiting-panel" style="width:min(100%,860px);border:1px solid ${accent};box-shadow:0 10px 28px rgba(0,0,0,0.22);">
+                    <div class="waiting-panel-title">Resume du tour ${summary.roundNumber}</div>
+                    <div style="font-size:1.08rem;font-weight:700;color:${accent};margin-bottom:10px;">${escapeHtml(summary.title)}</div>
+                    <div style="font-size:1rem;line-height:1.6;color:#f2f2f2;">${escapeHtml(summary.message)}</div>
+                </div>
+            `;
+        }
+
         function renderOnlineSessionState(view) {
             if (view.status === 'waiting') {
                 renderOnlineWaitingRoom(view);
@@ -2073,6 +2095,16 @@
 
             if (view.status === 'secrets') {
                 renderOnlineSecretScreen(view);
+                return;
+            }
+
+            if (view.status === 'discussion') {
+                renderOnlineDiscussionScreen(view);
+                return;
+            }
+
+            if (view.status === 'finished') {
+                renderOnlineFinishedScreen(view);
                 return;
             }
 
@@ -2286,27 +2318,29 @@
                 const submittedClue = view.clues.find((entry) => entry.playerId === player.id);
                 let statusLabel = '<span style="opacity:0.7;">En attente</span>';
 
-                if (submittedClue) {
+                if (!player.alive) {
+                    statusLabel = `<span style="opacity:0.75;">Elimine${player.revealedRole ? ` (${getOnlineRoleLabel(player.revealedRole)})` : ''}</span>`;
+                } else if (submittedClue) {
                     statusLabel = `<span style="font-weight:bold;color:#fff;">${escapeHtml(submittedClue.text)}</span>`;
-                } else if (view.status === 'clues' && view.activePlayerId === player.id) {
+                } else if (view.activePlayerId === player.id) {
                     statusLabel = `<span style="color:#ffd180;">${escapeHtml(player.name)} choisit son mot...</span>`;
                 }
 
                 return `
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border-radius:12px;background:#3a3a3a;">
-                        <span style="font-size:1rem;color:#fff;">${escapeHtml(player.name)}</span>
+                        <span style="font-size:1rem;${player.alive ? 'color:#fff;' : 'color:#aaa;text-decoration:line-through;'}">${escapeHtml(player.name)}</span>
                         <span style="font-size:0.98rem;text-align:right;">${statusLabel}</span>
                     </div>
                 `;
             }).join('');
 
-            const turnStatus = view.status === 'discussion'
-                ? 'Tous les mots ont ete proposes. Discutez ensemble puis identifiez les roles en vrai. La phase de vote synchronisee viendra ensuite.'
+            const turnStatus = !view.self.alive
+                ? 'Tu observes ce tour car tu as ete elimine. Les joueurs encore en vie continuent.'
                 : (view.yourTurn
                     ? 'Cest ton tour : propose un mot ou un indice court.'
                     : `${view.activePlayerName} choisit son mot...`);
 
-            const clueForm = view.status === 'clues' && view.yourTurn
+            const clueForm = view.canSubmitClue
                 ? `
                     <div class="waiting-panel" style="width:min(100%,560px);">
                         <div class="waiting-panel-title">Ton tour</div>
@@ -2332,13 +2366,14 @@
                     </svg>
                 </div>
                 <h2>Partie en ligne</h2>
-                <div style="width:min(100%,760px);padding:0 24px;display:flex;flex-direction:column;align-items:center;gap:22px;z-index:2;">
-                    <div class="waiting-panel" style="width:min(100%,760px);">
-                        <div class="waiting-panel-title">${view.status === 'discussion' ? 'Discussion' : 'Tour des mots'}</div>
+                <div style="width:min(100%,860px);padding:0 24px;display:flex;flex-direction:column;align-items:center;gap:22px;z-index:2;">
+                    ${renderOnlineRoundSummary(view.lastRoundSummary)}
+                    <div class="waiting-panel" style="width:min(100%,860px);">
+                        <div class="waiting-panel-title">Tour des mots - Tour ${view.roundNumber}</div>
                         <div style="font-size:1.05rem;line-height:1.5;color:#f1f1f1;">${turnStatus}</div>
                     </div>
                     ${clueForm}
-                    <div class="waiting-panel" style="width:min(100%,760px);">
+                    <div class="waiting-panel" style="width:min(100%,860px);">
                         <div class="waiting-panel-title">Mots proposes</div>
                         <div class="waiting-list">
                             ${cluesHtml}
@@ -2384,6 +2419,307 @@
                     }
                 }
             }
+        }
+
+        function renderOnlineDiscussionScreen(view) {
+            const playersBlock = view.players.map((player) => {
+                let subtitle = player.alive
+                    ? (player.hasVoted ? 'Vote envoye.' : 'Debat en cours...')
+                    : `Elimine${player.revealedRole ? ` (${getOnlineRoleLabel(player.revealedRole)})` : ''}`;
+
+                if (player.id === view.self.id && player.alive && player.hasVoted) {
+                    subtitle = 'Tu as deja vote pour ce debat.';
+                }
+
+                return `
+                    <div class="waiting-list-item ${player.alive ? 'waiting-list-item--guest' : 'waiting-list-item--placeholder'}">
+                        <div class="waiting-item-title">${escapeHtml(player.name)}${player.id === view.self.id ? ' (vous)' : ''}</div>
+                        <div class="waiting-item-subtitle">${subtitle}</div>
+                    </div>
+                `;
+            }).join('');
+
+            const cluesHtml = view.clues.map((entry) => `
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border-radius:12px;background:#3a3a3a;">
+                    <span style="font-size:1rem;color:#fff;">${escapeHtml(entry.playerName)}</span>
+                    <span style="font-size:0.98rem;text-align:right;font-weight:bold;color:#fff;">${escapeHtml(entry.text)}</span>
+                </div>
+            `).join('');
+
+            const chatMessagesHtml = view.discussionMessages.length
+                ? view.discussionMessages.map((message) => `
+                    <div style="padding:10px 12px;border-radius:12px;background:${message.playerId === view.self.id ? '#475943' : '#3a3a3a'};display:flex;flex-direction:column;gap:4px;">
+                        <span style="font-size:0.9rem;font-weight:700;color:#f3f3f3;">${escapeHtml(message.playerName)}</span>
+                        <span style="font-size:0.98rem;line-height:1.45;color:#f5f5f5;">${escapeHtml(message.text)}</span>
+                    </div>
+                `).join('')
+                : `<div style="padding:14px;border-radius:12px;background:#3a3a3a;color:#ddd;">Aucun message pour l'instant. Lancez le debat avant de voter.</div>`;
+
+            const aliveTargets = view.players.filter((player) => player.alive);
+            const targetOptions = aliveTargets.map((player) => `
+                <option value="${escapeHtml(player.id)}">${escapeHtml(player.name)}</option>
+            `).join('');
+            const roleOptions = view.guessRoleOptions.map((role, index) => `
+                <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#3a3a3a;color:#f1f1f1;cursor:pointer;">
+                    <input type="radio" name="onlineVoteRole" value="${escapeHtml(role.id)}" ${index === 0 ? 'checked' : ''}>
+                    <span>${escapeHtml(role.label)}</span>
+                </label>
+            `).join('');
+
+            let voteCard = '';
+            if (!view.self.alive) {
+                voteCard = `
+                    <div class="waiting-panel" style="width:min(100%,360px);">
+                        <div class="waiting-panel-title">Vote</div>
+                        <div style="font-size:0.98rem;line-height:1.55;color:#ddd;">Tu observes le debat, mais tu ne peux plus voter car tu as ete elimine.</div>
+                    </div>
+                `;
+            } else if (view.canVote) {
+                voteCard = `
+                    <div class="waiting-panel" style="width:min(100%,360px);">
+                        <div class="waiting-panel-title">Ton vote</div>
+                        <div style="display:flex;flex-direction:column;gap:14px;">
+                            <label style="display:flex;align-items:center;gap:10px;color:#f1f1f1;">
+                                <input type="radio" name="onlineVoteType" value="accuse" ${view.guessRoleOptions.length ? 'checked' : ''}>
+                                <span>Voter pour un joueur</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:10px;color:#f1f1f1;">
+                                <input type="radio" name="onlineVoteType" value="skip" ${view.guessRoleOptions.length ? '' : 'checked'}>
+                                <span>Skip le debat</span>
+                            </label>
+                            <div id="onlineVoteAccuseFields" style="display:${view.guessRoleOptions.length ? 'flex' : 'none'};flex-direction:column;gap:12px;">
+                                <select id="onlineVoteTarget" class="dialog-input">
+                                    ${targetOptions}
+                                </select>
+                                <div style="display:flex;flex-direction:column;gap:10px;">
+                                    ${roleOptions || '<div style="color:#ddd;">Aucun role special actif dans cette partie.</div>'}
+                                </div>
+                            </div>
+                            <div id="onlineVoteError" class="dialog-error" style="display:none;"></div>
+                            <div class="waiting-action-row" style="justify-content:flex-start;">
+                                <button id="submitOnlineVoteBtn" type="button">Valider mon vote</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (view.yourVote) {
+                const voteText = view.yourVote.type === 'skip'
+                    ? 'Tu as choisi de passer ce debat.'
+                    : `Tu votes contre ${escapeHtml(view.yourVote.targetPlayerName)} comme ${escapeHtml(view.yourVote.guessedRoleLabel)}.`;
+                voteCard = `
+                    <div class="waiting-panel" style="width:min(100%,360px);">
+                        <div class="waiting-panel-title">Vote envoye</div>
+                        <div style="font-size:0.98rem;line-height:1.55;color:#ddd;">${voteText}</div>
+                    </div>
+                `;
+            }
+
+            const chatComposer = view.canChat
+                ? `
+                    <div style="display:flex;gap:10px;align-items:flex-start;">
+                        <textarea id="onlineChatInput" class="dialog-input" rows="3" maxlength="220" placeholder="Ecris ton message pour le debat..." style="min-height:92px;resize:vertical;"></textarea>
+                    </div>
+                    <div id="onlineChatError" class="dialog-error" style="display:none;"></div>
+                    <div class="waiting-action-row" style="justify-content:flex-start;">
+                        <button id="sendOnlineChatBtn" type="button">Envoyer</button>
+                    </div>
+                `
+                : `
+                    <div style="font-size:0.95rem;line-height:1.55;color:#cfcfcf;">Tu peux lire le debat, mais seuls les joueurs encore en vie peuvent envoyer des messages.</div>
+                `;
+
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Debat du tour ${view.roundNumber}</h2>
+                <div style="width:min(100%,1100px);padding:0 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;align-items:start;z-index:2;">
+                    <div style="display:flex;flex-direction:column;gap:18px;">
+                        <div class="waiting-panel">
+                            <div class="waiting-panel-title">Votes</div>
+                            <div style="font-size:1rem;line-height:1.5;color:#f1f1f1;margin-bottom:12px;">
+                                ${view.votesSubmittedCount}/${view.eligibleVotersCount} joueur(s) ont vote.
+                            </div>
+                            <div class="waiting-list">
+                                ${playersBlock}
+                            </div>
+                        </div>
+                        ${voteCard}
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:18px;">
+                        ${renderOnlineRoundSummary(view.lastRoundSummary)}
+                        <div class="waiting-panel">
+                            <div class="waiting-panel-title">Mots du tour</div>
+                            <div class="waiting-list">
+                                ${cluesHtml}
+                            </div>
+                        </div>
+                        <div class="waiting-panel">
+                            <div class="waiting-panel-title">Chat du debat</div>
+                            <div style="display:flex;flex-direction:column;gap:10px;max-height:360px;overflow:auto;margin-bottom:14px;">
+                                ${chatMessagesHtml}
+                            </div>
+                            ${chatComposer}
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:18px;">
+                        <div class="waiting-role-card waiting-role-card--host" style="margin:0;">
+                            <div class="waiting-role-badge">Debat</div>
+                            <div class="waiting-role-title">Discutez puis votez</div>
+                            <p class="waiting-role-text">Le debat se termine automatiquement des que tous les joueurs encore en vie ont vote.</p>
+                        </div>
+                        <div class="waiting-panel">
+                            <div class="waiting-panel-title">Rappel</div>
+                            <div style="font-size:0.98rem;line-height:1.6;color:#ddd;">
+                                Choisis un joueur et le role que tu lui attribues, ou passe le debat avec <b>Skip</b>. Le tour suivant commencera automatiquement une fois tous les votes recus.
+                            </div>
+                        </div>
+                        <div class="waiting-action-row" style="justify-content:flex-start;">
+                            <button id="leaveOnlineDiscussionBtn" type="button" class="button-secondary">Quitter</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('leaveOnlineDiscussionBtn').addEventListener('click', leaveOnlineSession);
+
+            const chatInput = document.getElementById('onlineChatInput');
+            const chatError = document.getElementById('onlineChatError');
+            const chatButton = document.getElementById('sendOnlineChatBtn');
+
+            if (chatInput && chatError && chatButton) {
+                chatInput.addEventListener('keydown', function(event) {
+                    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                        event.preventDefault();
+                        sendChatMessage();
+                    }
+                });
+                chatButton.addEventListener('click', sendChatMessage);
+
+                async function sendChatMessage() {
+                    const text = chatInput.value.trim().substring(0, 220);
+                    if (!text) {
+                        chatError.textContent = 'Entre un message avant de lenvoyer.';
+                        chatError.style.display = 'block';
+                        chatInput.focus();
+                        return;
+                    }
+
+                    try {
+                        await performOnlineAction('/api/session/chat', { text });
+                        chatInput.value = '';
+                        chatError.style.display = 'none';
+                        await refreshOnlineSession(true);
+                    } catch (error) {
+                        chatError.textContent = error.message;
+                        chatError.style.display = 'block';
+                    }
+                }
+            }
+
+            const voteButton = document.getElementById('submitOnlineVoteBtn');
+            const voteError = document.getElementById('onlineVoteError');
+            const accuseFields = document.getElementById('onlineVoteAccuseFields');
+            const voteTypeInputs = document.querySelectorAll('input[name="onlineVoteType"]');
+
+            if (voteButton && voteError) {
+                function syncVoteFields() {
+                    const selectedType = document.querySelector('input[name="onlineVoteType"]:checked')?.value;
+                    if (accuseFields) {
+                        accuseFields.style.display = selectedType === 'accuse' ? 'flex' : 'none';
+                    }
+                }
+
+                voteTypeInputs.forEach((input) => input.addEventListener('change', syncVoteFields));
+                syncVoteFields();
+
+                voteButton.addEventListener('click', async function() {
+                    const selectedType = document.querySelector('input[name="onlineVoteType"]:checked')?.value || 'skip';
+                    const body = { type: selectedType };
+
+                    if (selectedType === 'accuse') {
+                        const target = document.getElementById('onlineVoteTarget')?.value || '';
+                        const role = document.querySelector('input[name="onlineVoteRole"]:checked')?.value || '';
+
+                        if (!target) {
+                            voteError.textContent = 'Choisis un joueur a viser.';
+                            voteError.style.display = 'block';
+                            return;
+                        }
+
+                        if (!role) {
+                            voteError.textContent = 'Choisis le role que tu suspectes.';
+                            voteError.style.display = 'block';
+                            return;
+                        }
+
+                        body.targetPlayerId = target;
+                        body.guessedRole = role;
+                    }
+
+                    try {
+                        await performOnlineAction('/api/session/vote', body);
+                        await refreshOnlineSession(true);
+                    } catch (error) {
+                        voteError.textContent = error.message;
+                        voteError.style.display = 'block';
+                    }
+                });
+            }
+        }
+
+        function renderOnlineFinishedScreen(view) {
+            const playersHtml = view.players.map((player) => {
+                const role = player.revealedRole ? getOnlineRoleLabel(player.revealedRole) : 'Role cache';
+                return `
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border-radius:12px;background:#3a3a3a;">
+                        <span style="font-size:1rem;${player.alive ? 'color:#fff;' : 'color:#aaa;text-decoration:line-through;'}">${escapeHtml(player.name)}${player.id === view.self.id ? ' (vous)' : ''}</span>
+                        <span style="font-size:0.98rem;text-align:right;color:#f3f3f3;">${escapeHtml(role)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Fin de partie</h2>
+                <div style="width:min(100%,920px);padding:0 24px;display:flex;flex-direction:column;gap:22px;z-index:2;">
+                    <div class="waiting-role-card waiting-role-card--host" style="margin:0;">
+                        <div class="waiting-role-badge">Resultat</div>
+                        <div class="waiting-role-title">${escapeHtml(view.winner?.title || 'Partie terminee')}</div>
+                        <p class="waiting-role-text">${escapeHtml(view.winner?.message || 'La partie est terminee.')}</p>
+                    </div>
+                    ${renderOnlineRoundSummary(view.lastRoundSummary)}
+                    <div class="waiting-panel">
+                        <div class="waiting-panel-title">Roles reveles</div>
+                        <div class="waiting-list">
+                            ${playersHtml}
+                        </div>
+                    </div>
+                    <div class="waiting-action-row">
+                        <button id="leaveOnlineFinishedBtn" type="button" class="button-secondary">Quitter la session</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('leaveOnlineFinishedBtn').addEventListener('click', leaveOnlineSession);
         }
 
         function showLocalSetupScreen(settings = getDefaultSessionSettings()) {

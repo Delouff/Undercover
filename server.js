@@ -73,6 +73,15 @@ function normalizeSettings(settings = {}, fallback = { players: 5, mrWhite: true
     };
 }
 
+function normalizeChatMessage(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().substring(0, 220);
+}
+
+function normalizeVoteRole(value) {
+    const role = String(value || '').trim().toLowerCase();
+    return role === 'mrwhite' || role === 'undercover' ? role : '';
+}
+
 function randomCode() {
     let code = '';
     do {
@@ -85,6 +94,10 @@ function randomPlayerId() {
     return crypto.randomUUID();
 }
 
+function randomMessageId() {
+    return crypto.randomUUID();
+}
+
 function shuffle(array) {
     const copy = [...array];
     for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -92,6 +105,12 @@ function shuffle(array) {
         [copy[i], copy[j]] = [copy[j], copy[i]];
     }
     return copy;
+}
+
+function roleLabel(role) {
+    if (role === 'mrwhite') return 'MrWhite';
+    if (role === 'undercover') return 'Undercover';
+    return 'Civil';
 }
 
 function updateSessionRevision(session) {
@@ -134,22 +153,219 @@ function buildAssignments(session) {
     });
 }
 
+function ensureSession(sessionCode) {
+    return sessions.get(String(sessionCode || '').trim().toUpperCase());
+}
+
+function ensurePlayer(session, playerId) {
+    return session.players.find((entry) => entry.id === playerId);
+}
+
+function getAlivePlayers(session) {
+    const aliveIds = new Set(session.alivePlayerIds || []);
+    return session.players.filter((entry) => aliveIds.has(entry.id));
+}
+
+function isPlayerAlive(session, playerId) {
+    return (session.alivePlayerIds || []).includes(playerId);
+}
+
+function getConfiguredGuessRoles(session) {
+    const roles = [];
+    if (session.settings.mrWhite) roles.push('mrwhite');
+    if (session.settings.undercover) roles.push('undercover');
+    return roles;
+}
+
+function getActiveCluePlayer(session) {
+    if (session.status !== 'clues') {
+        return null;
+    }
+
+    const alivePlayers = getAlivePlayers(session);
+    return alivePlayers[session.activeClueIndex] || null;
+}
+
+function getCluePlayerName(session, playerId) {
+    return session.players.find((entry) => entry.id === playerId)?.name || 'Joueur';
+}
+
+function determineWinner(session) {
+    const alivePlayers = getAlivePlayers(session);
+    const civilsAlive = alivePlayers.filter((player) => session.assignments[player.id]?.role === 'civil').length;
+    const undercoverAlive = alivePlayers.some((player) => session.assignments[player.id]?.role === 'undercover');
+    const mrWhiteAlive = alivePlayers.some((player) => session.assignments[player.id]?.role === 'mrwhite');
+
+    if (civilsAlive === 0 && (undercoverAlive || mrWhiteAlive)) {
+        if (undercoverAlive && mrWhiteAlive) {
+            return {
+                team: 'special',
+                title: 'Victoire de MrWhite et de l Undercover !',
+                message: 'Les roles speciaux ont reussi a survivre jusqu a la fin de la partie.'
+            };
+        }
+        if (undercoverAlive) {
+            return {
+                team: 'undercover',
+                title: 'Victoire de l Undercover !',
+                message: 'L Undercover a reussi a tromper tout le monde.'
+            };
+        }
+        return {
+            team: 'mrwhite',
+            title: 'Victoire de MrWhite !',
+            message: 'MrWhite a su rester cache jusqu a la fin.'
+        };
+    }
+
+    if (!undercoverAlive && !mrWhiteAlive && civilsAlive > 0) {
+        return {
+            team: 'civil',
+            title: 'Victoire des Civils !',
+            message: 'Tous les roles speciaux ont ete elimines.'
+        };
+    }
+
+    return null;
+}
+
+function buildVoteSummary(session, targetId, ballots) {
+    const target = ensurePlayer(session, targetId);
+    const actualRole = session.assignments[targetId]?.role || 'civil';
+    const roleTallies = new Map();
+
+    ballots.forEach((ballot) => {
+        if (!ballot.guessedRole) return;
+        roleTallies.set(ballot.guessedRole, (roleTallies.get(ballot.guessedRole) || 0) + 1);
+    });
+
+    const sortedRoles = [...roleTallies.entries()].sort((a, b) => b[1] - a[1]);
+    const bestRole = sortedRoles[0] || null;
+    const tiedRole = bestRole
+        ? sortedRoles.some((entry, index) => index > 0 && entry[1] === bestRole[1])
+        : false;
+    const guessedRole = bestRole && !tiedRole ? bestRole[0] : null;
+    const guessedRoleLabel = guessedRole ? roleLabel(guessedRole) : null;
+    const actualRoleLabel = roleLabel(actualRole);
+    const voteWasCorrect = Boolean(guessedRole && guessedRole === actualRole);
+    let message = '';
+
+    if (guessedRole) {
+        message = `${target.name} a ete elimine. Le salon le pensait ${guessedRoleLabel}. Son role reel etait ${actualRoleLabel}.`;
+    } else {
+        message = `${target.name} a ete elimine, mais le salon ne s est pas accorde sur son role. Son role reel etait ${actualRoleLabel}.`;
+    }
+
+    return {
+        roundNumber: session.roundNumber,
+        type: 'elimination',
+        title: `${target.name} elimine`,
+        message,
+        eliminatedPlayerId: target.id,
+        eliminatedPlayerName: target.name,
+        guessedRole,
+        guessedRoleLabel,
+        actualRole,
+        actualRoleLabel,
+        voteWasCorrect
+    };
+}
+
+function beginNextRound(session, summary) {
+    session.roundNumber += 1;
+    session.status = 'clues';
+    session.activeClueIndex = 0;
+    session.clues = [];
+    session.discussionMessages = [];
+    session.votes = {};
+    session.lastRoundSummary = summary;
+}
+
+function finishSession(session, summary, winner) {
+    session.status = 'finished';
+    session.activeClueIndex = 0;
+    session.clues = [];
+    session.discussionMessages = [];
+    session.votes = {};
+    session.lastRoundSummary = summary;
+    session.winner = winner;
+}
+
+function resolveDiscussion(session) {
+    const alivePlayers = getAlivePlayers(session);
+    const eligibleVoterCount = alivePlayers.length;
+    const votes = Object.values(session.votes || {});
+
+    if (votes.length !== eligibleVoterCount || eligibleVoterCount === 0) {
+        return;
+    }
+
+    const tally = new Map();
+    votes.forEach((vote) => {
+        const key = vote.type === 'skip' ? 'skip' : vote.targetPlayerId;
+        tally.set(key, (tally.get(key) || 0) + 1);
+    });
+
+    const sortedTargets = [...tally.entries()].sort((a, b) => b[1] - a[1]);
+    const bestTarget = sortedTargets[0] || null;
+    const hasTie = bestTarget
+        ? sortedTargets.some((entry, index) => index > 0 && entry[1] === bestTarget[1])
+        : false;
+
+    if (!bestTarget || hasTie || bestTarget[0] === 'skip') {
+        const summary = {
+            roundNumber: session.roundNumber,
+            type: 'skip',
+            title: 'Debat passe',
+            message: hasTie
+                ? 'Le vote est reste indecis. Personne n est elimine et un nouveau tour commence.'
+                : 'Le salon a choisi de passer le debat. Personne n est elimine et un nouveau tour commence.'
+        };
+        beginNextRound(session, summary);
+        return;
+    }
+
+    const targetId = bestTarget[0];
+    const targetBallots = votes.filter((vote) => vote.type === 'accuse' && vote.targetPlayerId === targetId);
+    const summary = buildVoteSummary(session, targetId, targetBallots);
+
+    session.alivePlayerIds = (session.alivePlayerIds || []).filter((entryId) => entryId !== targetId);
+
+    const winner = determineWinner(session);
+    if (winner) {
+        finishSession(session, summary, winner);
+        return;
+    }
+
+    beginNextRound(session, summary);
+}
+
 function buildSessionView(session, playerId) {
     const player = session.players.find((entry) => entry.id === playerId);
     const host = session.players.find((entry) => entry.id === session.hostPlayerId);
     const assignment = session.assignments ? session.assignments[playerId] : null;
-    const activePlayer = session.status === 'clues' ? session.players[session.activeClueIndex] : null;
+    const activePlayer = getActiveCluePlayer(session);
     const acknowledgedSet = session.secretAcknowledged || new Set();
+    const aliveIds = new Set(session.alivePlayerIds || []);
+    const alivePlayers = getAlivePlayers(session);
+    const configuredGuessRoles = getConfiguredGuessRoles(session);
+    const playerVote = session.votes ? session.votes[playerId] : null;
 
     return {
         code: session.code,
         revision: session.revision,
         status: session.status,
         isHost: session.hostPlayerId === playerId,
-        self: player ? { id: player.id, name: player.name } : null,
+        self: player ? {
+            id: player.id,
+            name: player.name,
+            alive: aliveIds.has(player.id)
+        } : null,
         hostName: host ? host.name : 'Hote',
         settings: session.settings,
         playerCount: session.players.length,
+        aliveCount: alivePlayers.length,
+        roundNumber: session.roundNumber,
         canStart: session.status === 'waiting'
             && session.hostPlayerId === playerId
             && session.players.length === session.settings.players,
@@ -157,8 +373,13 @@ function buildSessionView(session, playerId) {
             id: entry.id,
             name: entry.name,
             isHost: entry.id === session.hostPlayerId,
+            alive: aliveIds.has(entry.id),
             acknowledged: acknowledgedSet.has(entry.id),
-            clueSubmitted: session.clues.some((clue) => clue.playerId === entry.id)
+            clueSubmitted: session.clues.some((clue) => clue.playerId === entry.id),
+            hasVoted: Boolean(session.votes && session.votes[entry.id]),
+            revealedRole: !aliveIds.has(entry.id) || session.status === 'finished'
+                ? session.assignments?.[entry.id]?.role || null
+                : null
         })),
         secret: assignment ? {
             role: assignment.role,
@@ -170,13 +391,38 @@ function buildSessionView(session, playerId) {
         activePlayerId: activePlayer ? activePlayer.id : null,
         activePlayerName: activePlayer ? activePlayer.name : null,
         yourTurn: activePlayer ? activePlayer.id === playerId : false,
+        canSubmitClue: session.status === 'clues' && activePlayer ? activePlayer.id === playerId : false,
         clues: session.clues.map((clue) => ({
             playerId: clue.playerId,
-            playerName: session.players.find((entry) => entry.id === clue.playerId)?.name || 'Joueur',
+            playerName: getCluePlayerName(session, clue.playerId),
             text: clue.text
         })),
         submittedCount: session.clues.length,
-        totalTurns: session.players.length
+        totalTurns: alivePlayers.length,
+        guessRoleOptions: configuredGuessRoles.map((role) => ({
+            id: role,
+            label: roleLabel(role)
+        })),
+        discussionMessages: (session.discussionMessages || []).slice(-80).map((message) => ({
+            id: message.id,
+            playerId: message.playerId,
+            playerName: message.playerName,
+            text: message.text,
+            sentAt: message.sentAt
+        })),
+        canChat: session.status === 'discussion' && aliveIds.has(playerId),
+        canVote: session.status === 'discussion' && aliveIds.has(playerId) && !playerVote,
+        yourVote: playerVote ? {
+            type: playerVote.type,
+            targetPlayerId: playerVote.targetPlayerId || null,
+            targetPlayerName: playerVote.targetPlayerId ? getCluePlayerName(session, playerVote.targetPlayerId) : null,
+            guessedRole: playerVote.guessedRole || null,
+            guessedRoleLabel: playerVote.guessedRole ? roleLabel(playerVote.guessedRole) : null
+        } : null,
+        votesSubmittedCount: Object.keys(session.votes || {}).length,
+        eligibleVotersCount: alivePlayers.length,
+        lastRoundSummary: session.lastRoundSummary,
+        winner: session.winner
     };
 }
 
@@ -229,14 +475,6 @@ function serveStaticFile(req, res, pathname) {
     });
 }
 
-function ensureSession(sessionCode) {
-    return sessions.get(String(sessionCode || '').trim().toUpperCase());
-}
-
-function ensurePlayer(session, playerId) {
-    return session.players.find((entry) => entry.id === playerId);
-}
-
 async function handleApiRequest(req, res, pathname, searchParams) {
     if (req.method === 'POST' && pathname === '/api/session/create') {
         const body = await readJsonBody(req);
@@ -257,9 +495,15 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             status: 'waiting',
             revision: 1,
             assignments: null,
+            alivePlayerIds: [hostPlayerId],
             secretAcknowledged: new Set(),
             clues: [],
             activeClueIndex: 0,
+            roundNumber: 1,
+            discussionMessages: [],
+            votes: {},
+            lastRoundSummary: null,
+            winner: null,
             createdAt: Date.now(),
             updatedAt: Date.now()
         };
@@ -285,16 +529,6 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             return;
         }
 
-        if (session.status !== 'waiting') {
-            sendError(res, 400, 'La partie a deja commence.');
-            return;
-        }
-
-        if (!playerName) {
-            sendError(res, 400, 'Entre un pseudo avant de rejoindre la session.');
-            return;
-        }
-
         if (requestedPlayerId) {
             const existingById = ensurePlayer(session, requestedPlayerId);
             if (existingById) {
@@ -305,6 +539,16 @@ async function handleApiRequest(req, res, pathname, searchParams) {
                 });
                 return;
             }
+        }
+
+        if (session.status !== 'waiting') {
+            sendError(res, 400, 'La partie a deja commence.');
+            return;
+        }
+
+        if (!playerName) {
+            sendError(res, 400, 'Entre un pseudo avant de rejoindre la session.');
+            return;
         }
 
         const existingByName = session.players.find((entry) => entry.name.toLowerCase() === playerName.toLowerCase());
@@ -320,6 +564,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
 
         const playerId = randomPlayerId();
         session.players.push({ id: playerId, name: playerName });
+        session.alivePlayerIds.push(playerId);
         updateSessionRevision(session);
         sendJson(res, 201, {
             code,
@@ -363,7 +608,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         if (session.hostPlayerId !== player.id) {
-            sendError(res, 403, "Seul l'hote peut modifier les parametres.");
+            sendError(res, 403, "Seul l hote peut modifier les parametres.");
             return;
         }
 
@@ -399,7 +644,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         if (session.hostPlayerId !== player.id) {
-            sendError(res, 403, "Seul l'hote peut lancer la partie.");
+            sendError(res, 403, "Seul l hote peut lancer la partie.");
             return;
         }
 
@@ -409,9 +654,15 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         buildAssignments(session);
+        session.alivePlayerIds = session.players.map((entry) => entry.id);
         session.secretAcknowledged = new Set();
         session.clues = [];
         session.activeClueIndex = 0;
+        session.roundNumber = 1;
+        session.discussionMessages = [];
+        session.votes = {};
+        session.lastRoundSummary = null;
+        session.winner = null;
         session.status = 'secrets';
         updateSessionRevision(session);
         sendJson(res, 200, buildSessionView(session, player.id));
@@ -433,7 +684,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         if (session.status !== 'secrets') {
-            sendError(res, 400, "La phase de memorisation n'est plus active.");
+            sendError(res, 400, "La phase de memorisation n est plus active.");
             return;
         }
 
@@ -463,13 +714,18 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         if (session.status !== 'clues') {
-            sendError(res, 400, "La phase des mots n'est pas active.");
+            sendError(res, 400, 'La phase des mots n est pas active.');
             return;
         }
 
-        const activePlayer = session.players[session.activeClueIndex];
+        if (!isPlayerAlive(session, player.id)) {
+            sendError(res, 400, 'Ce joueur a deja ete elimine.');
+            return;
+        }
+
+        const activePlayer = getActiveCluePlayer(session);
         if (!activePlayer || activePlayer.id !== player.id) {
-            sendError(res, 400, "Ce n'est pas encore ton tour.");
+            sendError(res, 400, 'Ce n est pas encore ton tour.');
             return;
         }
 
@@ -489,12 +745,129 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             text
         });
 
-        if (session.activeClueIndex >= session.players.length - 1) {
+        const alivePlayers = getAlivePlayers(session);
+        if (session.clues.length >= alivePlayers.length) {
             session.status = 'discussion';
+            session.discussionMessages = [];
+            session.votes = {};
+            session.activeClueIndex = 0;
         } else {
             session.activeClueIndex += 1;
         }
 
+        updateSessionRevision(session);
+        sendJson(res, 200, buildSessionView(session, player.id));
+        return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/session/chat') {
+        const body = await readJsonBody(req);
+        const session = ensureSession(body.code);
+        if (!session) {
+            sendError(res, 404, 'Cette session est introuvable.');
+            return;
+        }
+
+        const player = ensurePlayer(session, body.playerId);
+        if (!player) {
+            sendError(res, 403, 'Joueur non reconnu pour cette session.');
+            return;
+        }
+
+        if (session.status !== 'discussion') {
+            sendError(res, 400, 'Le debat nest pas encore ouvert.');
+            return;
+        }
+
+        if (!isPlayerAlive(session, player.id)) {
+            sendError(res, 400, 'Les joueurs elimines ne peuvent plus parler dans le debat.');
+            return;
+        }
+
+        const text = normalizeChatMessage(body.text);
+        if (!text) {
+            sendError(res, 400, 'Entre un message avant de lenvoyer.');
+            return;
+        }
+
+        session.discussionMessages.push({
+            id: randomMessageId(),
+            playerId: player.id,
+            playerName: player.name,
+            text,
+            sentAt: Date.now()
+        });
+
+        updateSessionRevision(session);
+        sendJson(res, 200, buildSessionView(session, player.id));
+        return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/session/vote') {
+        const body = await readJsonBody(req);
+        const session = ensureSession(body.code);
+        if (!session) {
+            sendError(res, 404, 'Cette session est introuvable.');
+            return;
+        }
+
+        const player = ensurePlayer(session, body.playerId);
+        if (!player) {
+            sendError(res, 403, 'Joueur non reconnu pour cette session.');
+            return;
+        }
+
+        if (session.status !== 'discussion') {
+            sendError(res, 400, 'Le vote nest pas ouvert.');
+            return;
+        }
+
+        if (!isPlayerAlive(session, player.id)) {
+            sendError(res, 400, 'Les joueurs elimines ne peuvent plus voter.');
+            return;
+        }
+
+        if (session.votes[player.id]) {
+            sendError(res, 400, 'Tu as deja vote pour ce debat.');
+            return;
+        }
+
+        const voteType = String(body.type || '').trim().toLowerCase();
+        if (voteType !== 'skip' && voteType !== 'accuse') {
+            sendError(res, 400, 'Vote invalide.');
+            return;
+        }
+
+        if (voteType === 'skip') {
+            session.votes[player.id] = {
+                type: 'skip',
+                submittedAt: Date.now()
+            };
+        } else {
+            const targetPlayerId = String(body.targetPlayerId || '').trim();
+            const guessedRole = normalizeVoteRole(body.guessedRole);
+            const target = ensurePlayer(session, targetPlayerId);
+            const allowedRoles = getConfiguredGuessRoles(session);
+
+            if (!target || !isPlayerAlive(session, target.id)) {
+                sendError(res, 400, 'Ce joueur ne peut pas etre vise par le vote.');
+                return;
+            }
+
+            if (!guessedRole || !allowedRoles.includes(guessedRole)) {
+                sendError(res, 400, 'Choisis un role valide avant de voter.');
+                return;
+            }
+
+            session.votes[player.id] = {
+                type: 'accuse',
+                targetPlayerId: target.id,
+                guessedRole,
+                submittedAt: Date.now()
+            };
+        }
+
+        resolveDiscussion(session);
         updateSessionRevision(session);
         sendJson(res, 200, buildSessionView(session, player.id));
         return;
