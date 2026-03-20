@@ -528,6 +528,7 @@
         });
 
         let sessionState = null;
+        let localGameSettings = null;
 
         function getDefaultSessionSettings() {
             return {
@@ -554,6 +555,44 @@
             }
 
             return pseudos;
+        }
+
+        function renderLocalRoleCard() {
+            return `
+                <div class="waiting-role-card waiting-role-card--host">
+                    <div class="waiting-role-badge">Local</div>
+                    <div class="waiting-role-title">Vous jouez sur un seul appareil</div>
+                    <p class="waiting-role-text">Pas de code de session ici. Vous reglez la partie, puis chaque joueur choisit sa carte a tour de role sur ce meme ecran.</p>
+                </div>
+            `;
+        }
+
+        function renderLocalSettingsCard(settings) {
+            return `
+                <div class="waiting-panel">
+                    <div class="waiting-panel-title">Parametres de partie</div>
+                    <div class="waiting-editor-head">
+                        <label class="waiting-editor-label" for="localPlayersRange">Nombre de joueurs</label>
+                        <div class="waiting-editor-value"><span id="localPlayersValue">${settings.players}</span> joueurs</div>
+                    </div>
+                    <input id="localPlayersRange" class="waiting-range" type="range" min="3" max="20" value="${settings.players}">
+                    <div class="waiting-range-scale">
+                        <span>3</span>
+                        <span>20</span>
+                    </div>
+                    <div class="waiting-toggle-list">
+                        <label class="waiting-toggle">
+                            <input id="localMrWhiteCheckbox" type="checkbox" ${settings.mrWhite ? 'checked' : ''}>
+                            <span>Activer Mr. White</span>
+                        </label>
+                        <label class="waiting-toggle">
+                            <input id="localUndercoverCheckbox" type="checkbox" ${settings.undercover ? 'checked' : ''}>
+                            <span>Activer Undercover</span>
+                        </label>
+                    </div>
+                    <div class="waiting-editor-note">Ces reglages s'appliquent directement a la prochaine manche locale.</div>
+                </div>
+            `;
         }
 
         function normalizeBooleanSetting(value, fallback) {
@@ -673,10 +712,7 @@
                 return;
             }
 
-            showWaitingRoomScreen(createSessionCode(), {
-                isHost: true,
-                settings: getDefaultSessionSettings()
-            });
+            showLocalSetupScreen(localGameSettings || getDefaultSessionSettings());
         }
 
         function escapeHtml(value) {
@@ -1812,6 +1848,109 @@
             });
         }
 
+        function showLocalSetupScreen(settings = getDefaultSessionSettings()) {
+            sessionState = null;
+            localGameSettings = normalizeSessionSettings(settings);
+
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Partie locale</h2>
+                <div class="waiting-layout">
+                    <div class="waiting-stage">
+                        <div class="waiting-side waiting-side--players">
+                            <div class="waiting-panel">
+                                <div class="waiting-panel-title">Deroulement</div>
+                                <div class="waiting-list">
+                                    <div class="waiting-list-item waiting-list-item--host">
+                                        <div class="waiting-item-title">Un seul appareil</div>
+                                        <div class="waiting-item-subtitle">Tous les joueurs se passent cet ecran a tour de role.</div>
+                                    </div>
+                                    <div class="waiting-list-item waiting-list-item--guest">
+                                        <div class="waiting-item-title">Choix des cartes</div>
+                                        <div class="waiting-item-subtitle">Chaque joueur choisit sa carte, puis memorise son mot.</div>
+                                    </div>
+                                    <div class="waiting-list-item waiting-list-item--placeholder">
+                                        <div class="waiting-item-title">Aucun partage requis</div>
+                                        <div class="waiting-item-subtitle">Pas de code, pas de lien : la partie reste entierement locale.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="waiting-main">
+                            ${renderLocalRoleCard()}
+                            <div class="waiting-code-card">
+                                <p class="waiting-code-text">Configure la partie puis lance directement la distribution des cartes sur cet appareil.</p>
+                                <div class="waiting-code-block" style="letter-spacing:0.12rem;font-size:2rem;">MODE LOCAL</div>
+                            </div>
+                            <div class="waiting-action-row">
+                                <button id="launchLocalGameBtn" type="button">Lancer la partie</button>
+                                <button id="backHomeLocalBtn" type="button" class="button-secondary">Retour</button>
+                            </div>
+                            <p class="waiting-note waiting-note--primary">Les reglages sont modifies ici, puis la partie demarre sans passer par une salle d'attente en ligne.</p>
+                            <p class="waiting-note waiting-note--secondary">Chaque joueur gardera encore son pseudo directement au moment de prendre sa carte en mode local.</p>
+                        </div>
+                        <div class="waiting-side waiting-side--settings">
+                            ${renderLocalSettingsCard(localGameSettings)}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const rangeInput = document.getElementById('localPlayersRange');
+            const playersValue = document.getElementById('localPlayersValue');
+            const mrWhiteCheckbox = document.getElementById('localMrWhiteCheckbox');
+            const undercoverCheckbox = document.getElementById('localUndercoverCheckbox');
+
+            function updateLocalSettings(partialSettings) {
+                localGameSettings = normalizeSessionSettings({
+                    ...localGameSettings,
+                    ...partialSettings
+                });
+
+                playersValue.textContent = localGameSettings.players;
+                if (Number(rangeInput.value) !== localGameSettings.players) {
+                    rangeInput.value = String(localGameSettings.players);
+                }
+                mrWhiteCheckbox.checked = localGameSettings.mrWhite;
+                undercoverCheckbox.checked = localGameSettings.undercover;
+            }
+
+            rangeInput.addEventListener('input', function() {
+                updateLocalSettings({
+                    players: parseInt(this.value, 10)
+                });
+            });
+            mrWhiteCheckbox.addEventListener('change', function() {
+                updateLocalSettings({
+                    mrWhite: this.checked
+                });
+            });
+            undercoverCheckbox.addEventListener('change', function() {
+                updateLocalSettings({
+                    undercover: this.checked
+                });
+            });
+
+            document.getElementById('launchLocalGameBtn').addEventListener('click', function() {
+                showCardsScreen(localGameSettings.players, localGameSettings.mrWhite, localGameSettings.undercover, {
+                    source: 'local'
+                });
+            });
+            document.getElementById('backHomeLocalBtn').addEventListener('click', function() {
+                window.location.reload();
+            });
+        }
+
         function showOptionsScreen(mode = 'local') {
             const isSessionMode = mode === 'session' && !!sessionState;
             const settings = normalizeSessionSettings(
@@ -1823,11 +1962,16 @@
                 ? sessionState.code
                 : createSessionCode();
 
-            showWaitingRoomScreen(code, {
-                isHost: isSessionMode && sessionState ? sessionState.isHost : true,
-                settings: settings,
-                playerName: isSessionMode && sessionState ? sessionState.playerName : ''
-            });
+            if (isSessionMode) {
+                showWaitingRoomScreen(code, {
+                    isHost: sessionState.isHost,
+                    settings: settings,
+                    playerName: sessionState.playerName
+                });
+                return;
+            }
+
+            showLocalSetupScreen(settings);
         }
 
         function attachOptionsFormListener() {
@@ -1835,10 +1979,7 @@
         }
 
         document.getElementById('startBtn').addEventListener('click', function() {
-            showWaitingRoomScreen(createSessionCode(), {
-                isHost: true,
-                settings: getDefaultSessionSettings()
-            });
+            showLocalSetupScreen(getDefaultSessionSettings());
         });
     </script>
 </body>
