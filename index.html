@@ -511,11 +511,7 @@
             const sharedSessionCode = getSessionCodeFromUrl();
             if (createBtn) {
                 createBtn.addEventListener('click', function() {
-                    let code = createSessionCode();
-                    showWaitingRoomScreen(code, {
-                        isHost: true,
-                        settings: getDefaultSessionSettings()
-                    });
+                    showCreateSessionDialog();
                 });
             }
             if (joinBtn) {
@@ -543,6 +539,21 @@
 
         function createSessionCode() {
             return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function normalizePlayerName(value) {
+            return String(value || '').trim().substring(0, 12);
+        }
+
+        function createSessionAutoPseudos(playerCount, firstPlayerName) {
+            const pseudos = [];
+            const primaryName = normalizePlayerName(firstPlayerName) || 'Joueur 1';
+
+            for (let i = 0; i < playerCount; i++) {
+                pseudos.push(i === 0 ? primaryName : `Joueur ${i + 1}`);
+            }
+
+            return pseudos;
         }
 
         function normalizeBooleanSetting(value, fallback) {
@@ -632,18 +643,22 @@
             `;
         }
 
-        function renderWaitingRoomRoleCard(isHost) {
+        function renderWaitingRoomRoleCard(isHost, playerName = '') {
             const badge = isHost ? 'Hote' : 'Invite';
             const title = isHost ? 'Tu controles cette session' : "Tu attends l'hote";
             const text = isHost
                 ? `Tu peux <strong>modifier les parametres</strong>, <strong>partager le lien</strong> et <strong>lancer la partie</strong> quand tout le monde est pret.`
                 : `Tu peux <strong>consulter le code</strong> et <strong>verifier les reglages</strong>, mais seul l'hote pourra modifier la session et lancer la partie.`;
+            const playerNote = playerName
+                ? `<p class="waiting-role-text" style="margin-top:10px;"><strong>Pseudo :</strong> ${escapeHtml(playerName)}</p>`
+                : '';
 
             return `
                 <div class="waiting-role-card ${isHost ? 'waiting-role-card--host' : 'waiting-role-card--guest'}">
                     <div class="waiting-role-badge">${badge}</div>
                     <div class="waiting-role-title">${title}</div>
                     <p class="waiting-role-text">${text}</p>
+                    ${playerNote}
                 </div>
             `;
         }
@@ -652,7 +667,8 @@
             if (sessionState && sessionState.code) {
                 showWaitingRoomScreen(sessionState.code, {
                     isHost: sessionState.isHost,
-                    settings: sessionState.settings
+                    settings: sessionState.settings,
+                    playerName: sessionState.playerName
                 });
                 return;
             }
@@ -801,11 +817,60 @@
             });
         }
 
-        function showJoinSessionDialog(initialCode = '') {
+        function showCreateSessionDialog(initialPseudo = '') {
+            const overlay = createDialog(`
+                <div class="dialog-kicker">Creer une session</div>
+                <h3>Choisis ton pseudo</h3>
+                <p>Ton pseudo sera utilise des l'entree dans la session en ligne.</p>
+                <input id="createSessionPseudoInput" class="dialog-input" type="text" maxlength="12" placeholder="Ton pseudo" value="${escapeHtml(initialPseudo)}">
+                <div id="createSessionError" class="dialog-error" style="display:none;"></div>
+                <div class="dialog-actions">
+                    <button id="createSessionConfirmBtn" type="button">Creer la session</button>
+                    <button id="createSessionCancelBtn" type="button" class="button-secondary">Annuler</button>
+                </div>
+            `);
+
+            const input = document.getElementById('createSessionPseudoInput');
+            const errorBox = document.getElementById('createSessionError');
+            input.focus();
+
+            input.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    submitCreateSession();
+                }
+            });
+
+            document.getElementById('createSessionConfirmBtn').addEventListener('click', submitCreateSession);
+            document.getElementById('createSessionCancelBtn').addEventListener('click', function() {
+                closeDialog(overlay);
+            });
+
+            function submitCreateSession() {
+                const playerName = normalizePlayerName(input.value);
+                if (!playerName) {
+                    errorBox.textContent = 'Entre un pseudo avant de creer la session.';
+                    errorBox.style.display = 'block';
+                    input.focus();
+                    return;
+                }
+
+                closeDialog(overlay);
+                const code = createSessionCode();
+                showWaitingRoomScreen(code, {
+                    isHost: true,
+                    settings: getDefaultSessionSettings(),
+                    playerName: playerName
+                });
+            }
+        }
+
+        function showJoinSessionDialog(initialCode = '', initialPseudo = '') {
             const overlay = createDialog(`
                 <div class="dialog-kicker">Rejoindre une session</div>
                 <h3>Entre le code</h3>
-                <p>Saisis le code partage par l'hote pour tenter de rejoindre sa partie.</p>
+                <p>Saisis ton pseudo et le code partage par l'hote pour rejoindre sa partie.</p>
+                <input id="joinSessionPseudoInput" class="dialog-input" type="text" maxlength="12" placeholder="Ton pseudo" value="${escapeHtml(initialPseudo)}">
                 <input id="joinSessionCodeInput" class="dialog-input" type="text" maxlength="10" placeholder="Exemple : A1B2C3" value="${escapeHtml(initialCode)}">
                 <div id="joinSessionError" class="dialog-error" style="display:none;"></div>
                 <div class="dialog-actions">
@@ -814,10 +879,17 @@
                 </div>
             `);
 
+            const pseudoInput = document.getElementById('joinSessionPseudoInput');
             const input = document.getElementById('joinSessionCodeInput');
             const errorBox = document.getElementById('joinSessionError');
 
-            input.focus();
+            pseudoInput.focus();
+            pseudoInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    submitJoinCode();
+                }
+            });
             input.addEventListener('keydown', function(event) {
                 if (event.key === 'Enter') {
                     event.preventDefault();
@@ -831,7 +903,15 @@
             });
 
             function submitJoinCode() {
+                const playerName = normalizePlayerName(pseudoInput.value);
                 const code = input.value.trim().toUpperCase();
+                if (!playerName) {
+                    errorBox.textContent = 'Entre un pseudo avant de continuer.';
+                    errorBox.style.display = 'block';
+                    pseudoInput.focus();
+                    return;
+                }
+
                 if (!code) {
                     errorBox.textContent = 'Entre un code de session avant de continuer.';
                     errorBox.style.display = 'block';
@@ -842,7 +922,8 @@
                 closeDialog(overlay);
                 showWaitingRoomScreen(code, {
                     isHost: false,
-                    settings: getSessionSettingsFromUrl()
+                    settings: getSessionSettingsFromUrl(),
+                    playerName: playerName
                 });
             }
         }
@@ -936,7 +1017,10 @@
         }
 
         // Affiche l'écran de sélection des cartes
-        async function showCardsScreen(nbJoueurs, mrWhite, undercover) {
+        async function showCardsScreen(nbJoueurs, mrWhite, undercover, options = {}) {
+            const autoPseudosQueue = Array.isArray(options.autoPseudosQueue)
+                ? [...options.autoPseudosQueue]
+                : null;
             const motsFrancais = [
                 "chat", "chien", "maison", "voiture", "pain", "eau", "livre", "arbre", "soleil", "lune",
                 "porte", "table", "fleur", "route", "montagne", "mer", "pomme", "banane", "fromage", "clé",
@@ -1017,10 +1101,19 @@
                 const role = cardElement.getAttribute('data-role');
                 const mot = cardElement.getAttribute('data-mot');
                 let pseudo = '';
+                const autoPseudo = autoPseudosQueue && autoPseudosQueue.length
+                    ? autoPseudosQueue.shift()
+                    : '';
 
                 const overlay = document.createElement('div');
                 overlay.className = 'dialog-overlay';
                 document.body.appendChild(overlay);
+
+                if (autoPseudo) {
+                    pseudo = autoPseudo;
+                    renderWordStep();
+                    return;
+                }
 
                 renderPseudoStep();
 
@@ -1550,6 +1643,10 @@
                 isHost: typeof options.isHost === 'boolean'
                     ? options.isHost
                     : (previousState ? previousState.isHost : true),
+                playerName: normalizePlayerName(
+                    options.playerName
+                    || (previousState ? previousState.playerName : '')
+                ),
                 settings: normalizeSessionSettings(
                     options.settings
                     || (previousState ? previousState.settings : getDefaultSessionSettings())
@@ -1558,6 +1655,7 @@
 
             const settings = sessionState.settings;
             const isHost = sessionState.isHost;
+            const playerName = sessionState.playerName || (isHost ? 'Hote' : 'Invite');
             const actionButtons = isHost
                 ? `
                     <button id="launchSessionBtn" type="button">Lancer la partie</button>
@@ -1571,7 +1669,7 @@
             const playersBlock = isHost
                 ? `
                     <div class="waiting-list-item waiting-list-item--host">
-                        <div class="waiting-item-title">Vous (hote)</div>
+                        <div class="waiting-item-title">${escapeHtml(playerName)} (hote)</div>
                         <div class="waiting-item-subtitle">Controle des reglages et lancement de la partie.</div>
                     </div>
                     <div class="waiting-list-item waiting-list-item--placeholder">
@@ -1585,7 +1683,7 @@
                         <div class="waiting-item-subtitle">Cette personne modifiera les reglages et lancera la partie.</div>
                     </div>
                     <div class="waiting-list-item waiting-list-item--guest">
-                        <div class="waiting-item-title">Vous (invite)</div>
+                        <div class="waiting-item-title">${escapeHtml(playerName)} (invite)</div>
                         <div class="waiting-item-subtitle">Lecture seule en attendant le vrai mode multijoueur.</div>
                     </div>
                     <div class="waiting-list-item waiting-list-item--placeholder">
@@ -1622,7 +1720,7 @@
                         </div>
                         </div>
                         <div class="waiting-main">
-                            ${renderWaitingRoomRoleCard(isHost)}
+                            ${renderWaitingRoomRoleCard(isHost, playerName)}
                             <div class="waiting-code-card">
                                 <p class="waiting-code-text">Partage ce code pour que les joueurs puissent rejoindre la partie.</p>
                                 <div class="waiting-code-block">${code}</div>
@@ -1702,7 +1800,10 @@
 
                 document.getElementById('launchSessionBtn').addEventListener('click', function() {
                     const currentSettings = normalizeSessionSettings(sessionState.settings);
-                    showCardsScreen(currentSettings.players, currentSettings.mrWhite, currentSettings.undercover);
+                    showCardsScreen(currentSettings.players, currentSettings.mrWhite, currentSettings.undercover, {
+                        autoPseudosQueue: createSessionAutoPseudos(currentSettings.players, sessionState.playerName),
+                        source: 'session'
+                    });
                 });
             }
 
@@ -1724,7 +1825,8 @@
 
             showWaitingRoomScreen(code, {
                 isHost: isSessionMode && sessionState ? sessionState.isHost : true,
-                settings: settings
+                settings: settings,
+                playerName: isSessionMode && sessionState ? sessionState.playerName : ''
             });
         }
 
