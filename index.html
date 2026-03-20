@@ -2098,8 +2098,8 @@
             const missingPlayers = Math.max(0, view.settings.players - view.playerCount);
             const helperMessage = view.isHost
                 ? (missingPlayers === 0
-                    ? 'Tous les joueurs sont connectes. Tu peux lancer la partie.'
-                    : `Encore ${missingPlayers} joueur(s) a connecter avant le lancement.`)
+                    ? `Le salon a atteint sa capacite maximale de ${view.settings.players} joueur(s). Tu peux lancer la partie.`
+                    : `Le salon peut accueillir jusqu'a ${view.settings.players} joueur(s). Encore ${missingPlayers} joueur(s) a connecter avant le lancement.`)
                 : `En attente du lancement par l'hote. Joueurs connectes : ${view.playerCount}/${view.settings.players}.`;
             const actionButtons = view.isHost
                 ? `

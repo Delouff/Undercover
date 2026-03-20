@@ -314,7 +314,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         if (session.players.length >= session.settings.players) {
-            sendError(res, 400, 'La session est deja complete.');
+            sendError(res, 400, 'Ce salon est actuellement complet.');
             return;
         }
 
