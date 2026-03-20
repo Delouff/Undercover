@@ -12,47 +12,70 @@
             flex-direction: column;
             justify-content: flex-start;
             align-items: center;
-            min-height: 100vh;
+            height: 100svh;
+            min-height: 100svh;
             margin: 0;
-            padding: 24px 0 48px;
+            padding: clamp(10px, 1.8vh, 16px) 0 clamp(12px, 2vh, 18px);
             box-sizing: border-box;
-            background: #222;
+            background: linear-gradient(180deg, #111214 0%, #161411 46%, #1c1712 100%);
             color: #fff;
             font-family: "Trebuchet MS", "Segoe UI", sans-serif;
             position: relative;
             overflow-x: hidden;
-            overflow-y: auto;
+            overflow-y: hidden;
+        }
+        body > * {
+            box-sizing: border-box;
         }
         /* Silhouette style (type code name) */
         .silhouette-bg {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100vw;
-            height: 40vh;
+            inset: 0;
             pointer-events: none;
             z-index: 0;
-            background: none;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 16% 18%, rgba(255, 167, 77, 0.14), transparent 24%),
+                radial-gradient(circle at 84% 15%, rgba(95, 192, 174, 0.13), transparent 22%),
+                radial-gradient(circle at 50% 100%, rgba(63, 50, 35, 0.35), transparent 34%),
+                linear-gradient(180deg, #111214 0%, #161411 44%, #1c1712 100%);
+        }
+        .silhouette-bg::before {
+            content: "";
+            position: absolute;
+            inset: -16% -8%;
+            background:
+                repeating-linear-gradient(90deg, transparent 0 122px, rgba(255, 255, 255, 0.018) 122px 123px),
+                repeating-linear-gradient(0deg, transparent 0 122px, rgba(255, 255, 255, 0.018) 122px 123px);
+            opacity: 0.18;
+            transform: perspective(1200px) rotateX(72deg) scale(1.5) translateY(18%);
+            animation: homeGridDrift 22s linear infinite;
+        }
+        .silhouette-bg::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at center, transparent 34%, rgba(0, 0, 0, 0.42) 76%, rgba(0, 0, 0, 0.72) 100%),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M650 648 C760 608 892 604 1062 642' stroke='rgba(103,74,56,0.58)' stroke-width='18'/%3E%3Cpath d='M822 520 C874 520 914 548 914 598 C914 654 870 696 812 696 C764 696 726 662 726 612 C726 566 760 534 800 534 C842 534 868 560 868 594 C868 622 848 640 826 646' stroke='rgba(136,223,182,0.42)' stroke-width='6'/%3E%3Cellipse cx='816' cy='520' rx='122' ry='76' fill='rgba(38,79,69,0.34)' stroke='rgba(136,223,182,0.28)' stroke-width='4'/%3E%3Ccircle cx='716' cy='506' r='36' fill='rgba(38,79,69,0.34)' stroke='rgba(136,223,182,0.28)' stroke-width='4'/%3E%3Cpath d='M784 472 L876 432' stroke='rgba(136,223,182,0.24)' stroke-width='6'/%3E%3Cpath d='M784 586 L744 656' stroke='rgba(136,223,182,0.22)' stroke-width='6'/%3E%3Cpath d='M848 586 L890 654' stroke='rgba(136,223,182,0.22)' stroke-width='6'/%3E%3Cpath d='M1020 302 C1068 318 1098 346 1086 402' stroke='rgba(217,92,73,0.28)' stroke-width='4' stroke-dasharray='10 12'/%3E%3Cpath d='M1160 220 C1108 238 1070 270 1086 402' stroke='rgba(217,92,73,0.28)' stroke-width='4' stroke-dasharray='10 12'/%3E%3Crect x='972' y='166' width='136' height='88' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Crect x='1122' y='188' width='132' height='82' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Crect x='1026' y='320' width='136' height='88' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Ccircle cx='1020' cy='302' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Ccircle cx='1160' cy='220' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Ccircle cx='1086' cy='402' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Cpath d='M1176 640 C1218 588 1284 572 1334 592 C1298 616 1282 642 1278 672 C1246 652 1210 648 1176 640 Z' fill='rgba(8,11,11,0.28)' stroke='rgba(255,255,255,0.04)' stroke-width='1.2'/%3E%3C/g%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center center, center bottom;
+            background-size: cover, cover;
+            opacity: 0.94;
         }
         .silhouette {
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 600px;
-            height: 220px;
-            opacity: 0.18;
-            z-index: 1;
+            display: none;
         }
         h1, h2 {
-            margin: 0 0 28px;
-            font-size: 2.5rem;
+            margin: 0 0 clamp(12px, 1.8vh, 18px);
+            font-size: clamp(2rem, 4vw, 3.2rem);
             z-index: 2;
             text-align: center;
+            flex: 0 0 auto;
         }
         button {
-            padding: 15px 40px;
-            font-size: 1.2rem;
+            padding: 12px 26px;
+            font-size: 1.04rem;
             border: none;
             border-radius: 8px;
             background: linear-gradient(135deg, #ffb44c, #ff931f);
@@ -367,7 +390,8 @@
             position: relative;
             z-index: 2;
             width: min(1180px, calc(100% - 48px));
-            margin: 28px auto 0;
+            max-height: calc(100svh - 64px);
+            margin: 8px auto 0;
             display: grid;
             grid-template-columns: minmax(0, 1fr);
             gap: 28px;
@@ -385,6 +409,7 @@
         }
         .home-copy {
             width: min(100%, 780px);
+            max-height: 100%;
             padding: 40px 42px 36px;
             display: flex;
             flex-direction: column;
@@ -507,6 +532,7 @@
         }
         .home-side-card {
             width: min(100%, 680px);
+            max-height: 100%;
             padding: 28px;
             display: flex;
             flex-direction: column;
@@ -656,14 +682,19 @@
         }
         .waiting-layout {
             width: min(100%, 1240px);
-            padding: 0 24px;
+            height: calc(100svh - 96px);
+            padding: 0 18px;
+            display: flex;
+            align-items: stretch;
             z-index: 2;
         }
         .waiting-stage {
+            flex: 1;
             display: grid;
-            grid-template-columns: minmax(250px, 300px) minmax(360px, 1fr) minmax(250px, 300px);
+            min-height: 0;
+            grid-template-columns: minmax(220px, 270px) minmax(340px, 1fr) minmax(220px, 270px);
             grid-template-areas: "players main settings";
-            gap: 22px;
+            gap: 16px;
             align-items: start;
         }
         .waiting-main {
@@ -671,13 +702,16 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 18px;
+            justify-content: center;
+            min-height: 0;
+            gap: 12px;
             text-align: center;
         }
         .waiting-side {
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            min-height: 0;
+            gap: 12px;
         }
         .waiting-side--players {
             grid-area: players;
@@ -687,10 +721,11 @@
         }
         .waiting-role-card {
             width: min(100%, 540px);
-            padding: 22px 24px;
+            padding: 18px 20px;
             border-radius: 18px;
             box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
             text-align: left;
+            overflow: hidden;
         }
         .waiting-role-card--host {
             background: linear-gradient(135deg, rgba(255, 176, 51, 0.28), rgba(66, 48, 20, 0.92));
@@ -733,17 +768,21 @@
             color: #fff;
         }
         .waiting-panel {
-            padding: 22px;
+            padding: 18px;
             border-radius: 16px;
             background: #2d2d2d;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
         .waiting-code-card {
             width: min(100%, 540px);
-            padding: 24px 24px 22px;
+            padding: 18px 20px;
             border-radius: 18px;
             background: rgba(35, 35, 35, 0.92);
             box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+            overflow: hidden;
         }
         .waiting-code-text {
             margin: 0 0 14px;
@@ -751,23 +790,23 @@
             line-height: 1.5;
         }
         .waiting-code-block {
-            padding: 18px 28px;
+            padding: 14px 18px;
             border-radius: 16px;
             background: #333;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-            font-size: 2.4rem;
+            font-size: clamp(1.6rem, 2.8vw, 2.2rem);
             font-weight: bold;
-            letter-spacing: 0.35rem;
+            letter-spacing: 0.24rem;
         }
         .waiting-action-row {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
             justify-content: center;
         }
         .waiting-panel-title {
-            margin-bottom: 12px;
-            font-size: 1.1rem;
+            margin-bottom: 10px;
+            font-size: 1.02rem;
             font-weight: bold;
         }
         .waiting-editor-head {
@@ -855,9 +894,12 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            min-height: 0;
+            overflow: auto;
+            padding-right: 4px;
         }
         .waiting-list-item {
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 12px;
             text-align: left;
         }
@@ -883,9 +925,9 @@
         }
         .waiting-note {
             margin: 0;
-            max-width: 540px;
+            max-width: 520px;
             z-index: 2;
-            line-height: 1.55;
+            line-height: 1.42;
             text-align: center;
         }
         .waiting-note--primary {
@@ -895,25 +937,32 @@
             opacity: 0.68;
         }
         .online-discussion-layout {
-            width: min(100%, 1440px);
-            padding: 0 24px;
+            width: min(100%, 1360px);
+            height: calc(100svh - 100px);
+            padding: 0 18px;
             display: grid;
-            grid-template-columns: minmax(230px, 290px) minmax(360px, 1fr) minmax(320px, 380px);
-            gap: 18px;
+            grid-template-columns: minmax(220px, 270px) minmax(320px, 1fr) minmax(290px, 340px);
+            gap: 16px;
             align-items: start;
             z-index: 2;
         }
         .online-discussion-column {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
             min-width: 0;
+            min-height: 0;
         }
         .online-vote-panel {
             align-self: stretch;
+            min-height: 0;
+        }
+        .online-vote-panel .waiting-list {
+            max-height: 240px;
         }
         .online-chat-panel {
-            min-height: 500px;
+            min-height: 0;
+            height: 100%;
             display: flex;
             flex-direction: column;
         }
@@ -921,11 +970,12 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            min-height: 260px;
-            max-height: 340px;
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none;
             overflow: auto;
             padding-right: 4px;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
         .online-chat-composer {
             margin-top: auto;
@@ -957,10 +1007,11 @@
         }
         .online-clue-stage {
             width: min(100%, 1260px);
-            padding: 0 24px;
+            height: calc(100svh - 100px);
+            padding: 0 18px;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-            gap: 22px;
+            grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+            gap: 16px;
             align-items: start;
             z-index: 2;
         }
@@ -968,13 +1019,19 @@
         .online-clue-sidebar {
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 14px;
             min-width: 0;
+            min-height: 0;
+        }
+        .online-clue-main .waiting-panel:last-child {
+            flex: 1 1 auto;
+            min-height: 0;
         }
         .online-clue-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 18px;
+            grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+            gap: 12px;
+            align-content: start;
         }
         .online-clue-card-slot {
             display: flex;
@@ -1002,13 +1059,13 @@
         }
         .online-clue-card {
             position: relative;
-            min-height: 220px;
+            min-height: 168px;
             perspective: 1400px;
         }
         .online-clue-card-inner {
             position: relative;
             width: 100%;
-            min-height: 220px;
+            min-height: 168px;
             transform-style: preserve-3d;
             transition: transform 760ms cubic-bezier(0.22, 0.61, 0.36, 1);
         }
@@ -1024,8 +1081,8 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            gap: 14px;
-            padding: 18px;
+            gap: 10px;
+            padding: 14px;
             border-radius: 20px;
             box-sizing: border-box;
             box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
@@ -1064,7 +1121,7 @@
             position: relative;
             z-index: 1;
             margin: 0;
-            font-size: 1.45rem;
+            font-size: 1.2rem;
             line-height: 1.2;
             text-align: center;
             word-break: break-word;
@@ -1073,7 +1130,7 @@
             position: relative;
             z-index: 1;
             margin: 0;
-            font-size: 0.96rem;
+            font-size: 0.88rem;
             line-height: 1.45;
             text-align: center;
             color: rgba(255, 255, 255, 0.74);
@@ -1082,7 +1139,7 @@
             position: relative;
             z-index: 1;
             margin: 0;
-            font-size: clamp(1.45rem, 2.3vw, 1.95rem);
+            font-size: clamp(1.2rem, 2vw, 1.7rem);
             line-height: 1.2;
             text-align: center;
             font-weight: bold;
@@ -1093,7 +1150,7 @@
             position: relative;
             z-index: 1;
             margin: 0;
-            font-size: 0.94rem;
+            font-size: 0.84rem;
             line-height: 1.4;
             text-align: center;
             color: rgba(255, 242, 220, 0.76);
@@ -1126,6 +1183,110 @@
         .online-clue-sidebar .waiting-panel,
         .online-clue-sidebar .waiting-role-card {
             width: auto;
+        }
+        .single-screen-stack {
+            width: min(100%, 920px);
+            height: calc(100svh - 104px);
+            padding: 0 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            z-index: 2;
+        }
+        .single-screen-stack--narrow {
+            width: min(100%, 560px);
+        }
+        .single-screen-stack--wide {
+            align-items: stretch;
+        }
+        .local-distribution-shell {
+            width: min(100%, 960px);
+            height: calc(100svh - 104px);
+            padding: 0 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            z-index: 2;
+        }
+        #cardsContainer {
+            width: min(100%, 900px);
+            max-height: calc(100svh - 220px);
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 12px;
+            justify-items: center;
+            align-content: center;
+            padding: 0 4px;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+        .card {
+            width: min(100%, 124px) !important;
+            height: 164px !important;
+            margin: 0 !important;
+        }
+        #startGameBtn {
+            margin-top: 20px !important;
+            padding: 12px 28px !important;
+            font-size: 1.08rem !important;
+            z-index: 2;
+        }
+        .local-game-layout {
+            width: min(100%, 1180px);
+            height: calc(100svh - 104px);
+            padding: 0 18px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+            gap: 16px;
+            align-items: start;
+            z-index: 2;
+        }
+        .local-game-panel,
+        .local-identify-panel {
+            background: rgba(31, 31, 31, 0.92);
+            border-radius: 20px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+            padding: 18px;
+            min-height: 0;
+        }
+        .local-game-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .local-status-list,
+        .local-identify-panel {
+            overflow: auto;
+        }
+        .local-status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 4px;
+        }
+        .local-status-row,
+        .local-identify-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .local-identify-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .local-identify-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
         }
         @keyframes clueCardFlipReveal {
             from {
@@ -1233,6 +1394,9 @@
             .online-clue-grid {
                 grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             }
+            .local-game-layout {
+                grid-template-columns: 1fr;
+            }
         }
         @media (max-width: 640px) {
             .home-title-row {
@@ -1279,10 +1443,10 @@
                 align-self: flex-start;
             }
             .online-clue-card {
-                min-height: 190px;
+                min-height: 150px;
             }
             .online-clue-card-inner {
-                min-height: 190px;
+                min-height: 150px;
             }
             .online-clue-card-face {
                 padding: 16px;
@@ -2487,7 +2651,8 @@
                     </svg>
                 </div>
                 <h2>Distribution des cartes</h2>
-                <div id="cardsContainer" style="display:flex;flex-wrap:wrap;justify-content:center;">
+                <div class="local-distribution-shell">
+                    <div id="cardsContainer" style="display:flex;flex-wrap:wrap;justify-content:center;">
             `;
             for(let i=0; i<nbJoueurs; i++) {
                 cardsHtml += `
@@ -2496,7 +2661,7 @@
                     </div>
                 `;
             }
-            cardsHtml += '</div>';
+            cardsHtml += '</div></div>';
 
             document.body.innerHTML = cardsHtml;
 
@@ -2646,7 +2811,12 @@
                                 btn.style.color = '#fff';
                                 btn.style.border = 'none';
                                 btn.style.cursor = 'pointer';
-                                document.body.appendChild(btn);
+                                const distributionShell = document.querySelector('.local-distribution-shell');
+                                if (distributionShell) {
+                                    distributionShell.appendChild(btn);
+                                } else {
+                                    document.body.appendChild(btn);
+                                }
 
                                 btn.addEventListener('click', function() {
                                     showGameScreen(joueurs, mrWhite, undercover);
@@ -2793,10 +2963,11 @@
                         </svg>
                     </div>
                     <h2>Partie en cours</h2>
-                    <div style="width:min(100%,760px);background:#2d2d2d;border-radius:18px;box-shadow:0 8px 24px #0003;padding:24px 22px;margin-bottom:26px;z-index:2;">
-                        <div style="font-size:1.35rem;font-weight:bold;margin-bottom:10px;">Tour des mots</div>
-                        <div style="font-size:1.05rem;line-height:1.5;color:#f1f1f1;margin-bottom:18px;">${turnStatus}</div>
-                        <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div class="local-game-layout">
+                        <div class="local-game-panel">
+                        <div style="font-size:1.25rem;font-weight:bold;margin-bottom:6px;">Tour des mots</div>
+                        <div style="font-size:0.98rem;line-height:1.45;color:#f1f1f1;margin-bottom:8px;">${turnStatus}</div>
+                        <div class="local-status-list">
                             ${joueurs.map((joueur, idx) => {
                                 let statusLabel = '<span style="opacity:0.7;">En attente</span>';
                                 if (joueur.motPropose) {
@@ -2808,25 +2979,25 @@
                                 }
 
                                 return `
-                                    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border-radius:12px;background:#3a3a3a;">
+                                    <div class="local-status-row">
                                         <span style="font-size:1rem;${joueur.eliminer ? 'text-decoration:line-through;color:#aaa;' : 'color:#fff;'}">${escapeHtml(joueur.pseudo)}</span>
                                         <span style="font-size:0.98rem;text-align:right;">${statusLabel}</span>
                                     </div>
                                 `;
                             }).join('')}
                         </div>
-                    </div>
-                    <div style="display:flex;flex-direction:column;align-items:center;">
+                        </div>
+                    <div class="local-identify-panel">
                 `;
                 joueurs.forEach((joueur, idx) => {
                     html += `
-                        <div style="display:flex;align-items:center;margin-bottom:20px;">
-                            <span class="pseudo-joueur" data-idx="${idx}" style="font-size:1.2rem;margin-right:30px;${joueur.eliminer ? 'text-decoration: line-through; color: #aaa;' : ''}">${joueur.pseudo}</span>
+                        <div class="local-identify-row">
+                            <span class="pseudo-joueur local-identify-name" data-idx="${idx}" style="${joueur.eliminer ? 'text-decoration: line-through; color: #aaa;' : ''}">${joueur.pseudo}</span>
                             <button class="identifierBtn" data-idx="${idx}" style="padding:8px 24px;font-size:1rem;border:none;border-radius:8px;background:${allWordsDone ? '#ff9800' : '#777'};color:#fff;cursor:${allWordsDone && !joueur.eliminer ? 'pointer' : 'not-allowed'};opacity:${joueur.eliminer || !allWordsDone ? '0.65' : '1'};" ${joueur.eliminer || !allWordsDone ? 'disabled' : ''}>${allWordsDone ? 'Identifier' : 'Attendre le tour'}</button>
                         </div>
                     `;
                 });
-                html += `</div>`;
+                html += `</div></div>`;
                 document.body.innerHTML = html;
 
                 if (!allWordsDone && turnState.lastSubmittedIndex !== null && turnState.currentIndex !== null) {
@@ -3513,7 +3684,7 @@
                     </svg>
                 </div>
                 <h2>Carte secrete</h2>
-                <div style="width:min(100%,540px);padding:0 24px;z-index:2;">
+                <div class="single-screen-stack single-screen-stack--narrow">
                     <div class="waiting-role-card waiting-role-card--host" style="margin:0 auto 18px;">
                         <div class="waiting-role-badge">${escapeHtml(view.self.name)}</div>
                         <div class="waiting-role-title">Memorise ton information</div>
@@ -4021,7 +4192,7 @@
                     </svg>
                 </div>
                 <h2>Fin de partie</h2>
-                <div style="width:min(100%,920px);padding:0 24px;display:flex;flex-direction:column;gap:22px;z-index:2;">
+                <div class="single-screen-stack single-screen-stack--wide">
                     <div class="waiting-role-card waiting-role-card--host" style="margin:0;">
                         <div class="waiting-role-badge">Resultat</div>
                         <div class="waiting-role-title">${escapeHtml(view.winner?.title || 'Partie terminee')}</div>
