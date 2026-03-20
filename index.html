@@ -7,10 +7,17 @@
     <meta name="theme-color" content="#151311">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2216%22 fill=%22%23111212%22/%3E%3Cg fill=%22none%22 stroke=%22%2387d9a3%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-width=%224%22%3E%3Cellipse cx=%2230%22 cy=%2228%22 rx=%2216%22 ry=%2210%22 fill=%22%23244b3f%22/%3E%3Ccircle cx=%2218%22 cy=%2226%22 r=%226%22 fill=%22%23244b3f%22/%3E%3Cpath d=%22M44 29c8 2 12 8 11 14-1 6-5 10-10 10-5 0-9-3-9-8 0-3 2-6 6-6 3 0 5 2 5 5 0 2-1 4-3 5%22/%3E%3Cpath d=%22M25 37l-5 10%22/%3E%3Cpath d=%22M34 37l5 10%22/%3E%3Cpath d=%22M34 19l10-6%22/%3E%3C/g%3E%3Ccircle cx=%2216.5%22 cy=%2225.2%22 r=%221.6%22 fill=%22%23f5ffd9%22/%3E%3Ccircle cx=%2216.7%22 cy=%2225.2%22 r=%220.8%22 fill=%22%230b0f0d%22/%3E%3C/svg%3E">
     <style>
+        :root {
+            --desktop-shell-width: min(1380px, calc(100vw - 88px));
+            --desktop-shell-width-tight: min(1280px, calc(100vw - 88px));
+            --desktop-shell-height: calc(100svh - 172px);
+            --desktop-home-height: calc(100svh - 60px);
+            --desktop-shell-gap: clamp(20px, 2.4vw, 30px);
+        }
         body {
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
+            justify-content: center;
             align-items: center;
             height: 100svh;
             min-height: 100svh;
@@ -59,8 +66,8 @@
                 radial-gradient(circle at center, transparent 34%, rgba(0, 0, 0, 0.42) 76%, rgba(0, 0, 0, 0.72) 100%),
                 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M650 648 C760 608 892 604 1062 642' stroke='rgba(103,74,56,0.58)' stroke-width='18'/%3E%3Cpath d='M822 520 C874 520 914 548 914 598 C914 654 870 696 812 696 C764 696 726 662 726 612 C726 566 760 534 800 534 C842 534 868 560 868 594 C868 622 848 640 826 646' stroke='rgba(136,223,182,0.42)' stroke-width='6'/%3E%3Cellipse cx='816' cy='520' rx='122' ry='76' fill='rgba(38,79,69,0.34)' stroke='rgba(136,223,182,0.28)' stroke-width='4'/%3E%3Ccircle cx='716' cy='506' r='36' fill='rgba(38,79,69,0.34)' stroke='rgba(136,223,182,0.28)' stroke-width='4'/%3E%3Cpath d='M784 472 L876 432' stroke='rgba(136,223,182,0.24)' stroke-width='6'/%3E%3Cpath d='M784 586 L744 656' stroke='rgba(136,223,182,0.22)' stroke-width='6'/%3E%3Cpath d='M848 586 L890 654' stroke='rgba(136,223,182,0.22)' stroke-width='6'/%3E%3Cpath d='M1020 302 C1068 318 1098 346 1086 402' stroke='rgba(217,92,73,0.28)' stroke-width='4' stroke-dasharray='10 12'/%3E%3Cpath d='M1160 220 C1108 238 1070 270 1086 402' stroke='rgba(217,92,73,0.28)' stroke-width='4' stroke-dasharray='10 12'/%3E%3Crect x='972' y='166' width='136' height='88' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Crect x='1122' y='188' width='132' height='82' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Crect x='1026' y='320' width='136' height='88' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Ccircle cx='1020' cy='302' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Ccircle cx='1160' cy='220' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Ccircle cx='1086' cy='402' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Cpath d='M1176 640 C1218 588 1284 572 1334 592 C1298 616 1282 642 1278 672 C1246 652 1210 648 1176 640 Z' fill='rgba(8,11,11,0.28)' stroke='rgba(255,255,255,0.04)' stroke-width='1.2'/%3E%3C/g%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: center center, center bottom;
-            background-size: cover, cover;
+            background-position: center center, center 58%;
+            background-size: cover, min(1560px, 118vw) auto;
             opacity: 0.94;
         }
         .silhouette {
@@ -304,6 +311,8 @@
             width: 100%;
             height: 100%;
             opacity: 0.92;
+            transform: translateY(-2%);
+            transform-origin: center;
         }
         .home-board {
             fill: rgba(24, 23, 20, 0.76);
@@ -389,13 +398,13 @@
         .home-shell {
             position: relative;
             z-index: 2;
-            width: min(1260px, calc(100% - 72px));
-            min-height: calc(100svh - 44px);
-            max-height: calc(100svh - 44px);
+            width: min(1300px, calc(100vw - 88px));
+            min-height: var(--desktop-home-height);
+            max-height: var(--desktop-home-height);
             margin: 0 auto;
             display: grid;
             grid-template-columns: minmax(180px, 210px) minmax(0, 660px) minmax(180px, 210px);
-            gap: clamp(40px, 5vw, 72px);
+            gap: clamp(46px, 5.8vw, 92px);
             justify-items: stretch;
             align-items: center;
             align-content: center;
@@ -688,21 +697,23 @@
             }
         }
         .waiting-layout {
-            width: min(100%, 1240px);
-            height: calc(100svh - 96px);
-            padding: 0 18px;
+            width: var(--desktop-shell-width);
+            height: var(--desktop-shell-height);
+            padding: 0 20px;
             display: flex;
-            align-items: stretch;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
             z-index: 2;
         }
         .waiting-stage {
             flex: 1;
             display: grid;
             min-height: 0;
-            grid-template-columns: minmax(220px, 270px) minmax(340px, 1fr) minmax(220px, 270px);
+            grid-template-columns: minmax(230px, 286px) minmax(400px, 1fr) minmax(230px, 286px);
             grid-template-areas: "players main settings";
-            gap: 16px;
-            align-items: start;
+            gap: var(--desktop-shell-gap);
+            align-items: center;
         }
         .waiting-main {
             grid-area: main;
@@ -944,13 +955,14 @@
             opacity: 0.68;
         }
         .online-discussion-layout {
-            width: min(100%, 1360px);
-            height: calc(100svh - 100px);
-            padding: 0 18px;
+            width: var(--desktop-shell-width);
+            height: var(--desktop-shell-height);
+            padding: 0 20px;
             display: grid;
-            grid-template-columns: minmax(220px, 270px) minmax(320px, 1fr) minmax(290px, 340px);
-            gap: 16px;
-            align-items: start;
+            grid-template-columns: minmax(235px, 285px) minmax(360px, 1fr) minmax(300px, 360px);
+            gap: var(--desktop-shell-gap);
+            align-items: center;
+            margin: 0 auto;
             z-index: 2;
         }
         .online-discussion-column {
@@ -1013,13 +1025,14 @@
             margin-bottom: 0;
         }
         .online-clue-stage {
-            width: min(100%, 1260px);
-            height: calc(100svh - 100px);
-            padding: 0 18px;
+            width: var(--desktop-shell-width-tight);
+            height: var(--desktop-shell-height);
+            padding: 0 20px;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
-            gap: 16px;
-            align-items: start;
+            grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+            gap: var(--desktop-shell-gap);
+            align-items: center;
+            margin: 0 auto;
             z-index: 2;
         }
         .online-clue-main,
@@ -1192,48 +1205,51 @@
             width: auto;
         }
         .single-screen-stack {
-            width: min(100%, 920px);
-            height: calc(100svh - 104px);
-            padding: 0 18px;
+            width: min(960px, calc(100vw - 88px));
+            height: var(--desktop-shell-height);
+            padding: 0 20px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            gap: 16px;
+            gap: 18px;
+            margin: 0 auto;
             z-index: 2;
         }
         .single-screen-stack--narrow {
-            width: min(100%, 560px);
+            width: min(620px, calc(100vw - 88px));
         }
         .single-screen-stack--wide {
+            width: min(1080px, calc(100vw - 88px));
             align-items: stretch;
         }
         .local-distribution-shell {
-            width: min(100%, 960px);
-            height: calc(100svh - 104px);
-            padding: 0 18px;
+            width: min(1040px, calc(100vw - 88px));
+            height: var(--desktop-shell-height);
+            padding: 0 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 18px;
+            gap: 22px;
+            margin: 0 auto;
             z-index: 2;
         }
         #cardsContainer {
-            width: min(100%, 900px);
-            max-height: calc(100svh - 220px);
+            width: min(960px, 100%);
+            max-height: calc(100svh - 320px);
             display: grid !important;
             grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-            gap: 12px;
+            gap: 14px;
             justify-items: center;
             align-content: center;
-            padding: 0 4px;
+            padding: 0 10px;
             box-sizing: border-box;
             z-index: 2;
         }
         .card {
-            width: min(100%, 124px) !important;
-            height: 164px !important;
+            width: min(100%, 128px) !important;
+            height: 170px !important;
             margin: 0 !important;
         }
         #startGameBtn {
@@ -1243,13 +1259,14 @@
             z-index: 2;
         }
         .local-game-layout {
-            width: min(100%, 1180px);
-            height: calc(100svh - 104px);
-            padding: 0 18px;
+            width: min(1260px, calc(100vw - 88px));
+            height: var(--desktop-shell-height);
+            padding: 0 20px;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
-            gap: 16px;
-            align-items: start;
+            grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+            gap: var(--desktop-shell-gap);
+            align-items: center;
+            margin: 0 auto;
             z-index: 2;
         }
         .local-game-panel,
