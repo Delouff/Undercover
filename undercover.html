@@ -1,0 +1,1743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Undercover</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #222;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            position: relative;
+            overflow: hidden;
+        }
+        /* Silhouette style (type code name) */
+        .silhouette-bg {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100vw;
+            height: 40vh;
+            pointer-events: none;
+            z-index: 0;
+            background: none;
+        }
+        .silhouette {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 220px;
+            opacity: 0.18;
+            z-index: 1;
+        }
+        h1, h2 {
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            z-index: 2;
+        }
+        button {
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 8px;
+            background: #ff9800;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s;
+            z-index: 2;
+        }
+        button:hover {
+            background: #e67c00;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+        }
+        label, input[type="number"] {
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            z-index: 2;
+        }
+        .dialog-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            z-index: 9999;
+        }
+        .dialog-card {
+            width: min(100%, 420px);
+            padding: 32px 28px;
+            border-radius: 18px;
+            background: #fff;
+            color: #222;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+            text-align: center;
+        }
+        .dialog-kicker {
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14rem;
+            color: #888;
+        }
+        .dialog-card h3 {
+            margin: 0 0 14px;
+            font-size: 1.8rem;
+            color: #111;
+        }
+        .dialog-card p {
+            margin: 0 0 18px;
+            color: #555;
+            line-height: 1.5;
+        }
+        .dialog-input {
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            border: 1px solid #d0d0d0;
+            border-radius: 12px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        .dialog-error {
+            margin-bottom: 14px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #fff1f1;
+            color: #b42318;
+            font-size: 0.95rem;
+        }
+        .dialog-word {
+            margin-bottom: 16px;
+            padding: 16px 18px;
+            border-radius: 14px;
+            background: #f4f4f4;
+            font-size: 1.25rem;
+            line-height: 1.5;
+            color: #111;
+        }
+        .dialog-card--wide {
+            width: min(100%, 500px);
+        }
+        .dialog-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .dialog-readonly {
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            border: 1px solid #d0d0d0;
+            border-radius: 12px;
+            background: #f7f7f7;
+            color: #222;
+            font-size: 1rem;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .dialog-help {
+            margin-top: -2px;
+            margin-bottom: 18px;
+            font-size: 0.95rem;
+            color: #666;
+        }
+        .dialog-note {
+            margin-top: 10px;
+            font-size: 0.92rem;
+            color: #777;
+            line-height: 1.5;
+        }
+        .qr-preview {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 18px;
+        }
+        .qr-image {
+            width: 220px;
+            height: 220px;
+            padding: 12px;
+            border-radius: 18px;
+            background: #fff;
+            box-shadow: inset 0 0 0 1px #e6e6e6;
+            object-fit: contain;
+        }
+        .toast-message {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 14px 18px;
+            border-radius: 12px;
+            background: rgba(20, 20, 20, 0.94);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+            z-index: 10000;
+            font-size: 1rem;
+        }
+        .button-secondary {
+            background: #555;
+        }
+        .button-secondary:hover {
+            background: #444;
+        }
+        .waiting-layout {
+            width: min(100%, 1240px);
+            padding: 0 24px;
+            z-index: 2;
+        }
+        .waiting-stage {
+            display: grid;
+            grid-template-columns: minmax(250px, 300px) minmax(360px, 1fr) minmax(250px, 300px);
+            grid-template-areas: "players main settings";
+            gap: 22px;
+            align-items: start;
+        }
+        .waiting-main {
+            grid-area: main;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 18px;
+            text-align: center;
+        }
+        .waiting-side {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .waiting-side--players {
+            grid-area: players;
+        }
+        .waiting-side--settings {
+            grid-area: settings;
+        }
+        .waiting-role-card {
+            width: min(100%, 540px);
+            padding: 22px 24px;
+            border-radius: 18px;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+            text-align: left;
+        }
+        .waiting-role-card--host {
+            background: linear-gradient(135deg, rgba(255, 176, 51, 0.28), rgba(66, 48, 20, 0.92));
+            border: 1px solid rgba(255, 210, 133, 0.35);
+        }
+        .waiting-role-card--guest {
+            background: linear-gradient(135deg, rgba(132, 177, 255, 0.2), rgba(33, 42, 58, 0.96));
+            border: 1px solid rgba(165, 194, 255, 0.28);
+        }
+        .waiting-role-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 999px;
+            margin-bottom: 14px;
+            font-size: 0.82rem;
+            font-weight: bold;
+            letter-spacing: 0.08rem;
+            text-transform: uppercase;
+        }
+        .waiting-role-card--host .waiting-role-badge {
+            background: rgba(255, 211, 140, 0.18);
+            color: #ffe2b1;
+        }
+        .waiting-role-card--guest .waiting-role-badge {
+            background: rgba(176, 204, 255, 0.16);
+            color: #d9e6ff;
+        }
+        .waiting-role-title {
+            margin: 0 0 8px;
+            font-size: 1.35rem;
+            font-weight: bold;
+        }
+        .waiting-role-text {
+            margin: 0;
+            line-height: 1.55;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .waiting-role-text strong {
+            color: #fff;
+        }
+        .waiting-panel {
+            padding: 22px;
+            border-radius: 16px;
+            background: #2d2d2d;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+        }
+        .waiting-code-card {
+            width: min(100%, 540px);
+            padding: 24px 24px 22px;
+            border-radius: 18px;
+            background: rgba(35, 35, 35, 0.92);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+        }
+        .waiting-code-text {
+            margin: 0 0 14px;
+            font-size: 1.05rem;
+            line-height: 1.5;
+        }
+        .waiting-code-block {
+            padding: 18px 28px;
+            border-radius: 16px;
+            background: #333;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            font-size: 2.4rem;
+            font-weight: bold;
+            letter-spacing: 0.35rem;
+        }
+        .waiting-action-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .waiting-panel-title {
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .waiting-editor-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+            text-align: left;
+        }
+        .waiting-editor-label {
+            font-size: 1rem;
+            font-weight: bold;
+        }
+        .waiting-editor-value {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            font-size: 0.95rem;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .waiting-range {
+            width: 100%;
+            margin: 0;
+            accent-color: #ff9800;
+        }
+        .waiting-range-scale {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            opacity: 0.66;
+        }
+        .waiting-toggle-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 16px;
+            text-align: left;
+        }
+        .waiting-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: #3a3a3a;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+        .waiting-toggle input {
+            margin: 0;
+            accent-color: #ff9800;
+            transform: scale(1.1);
+        }
+        .waiting-editor-note {
+            margin-top: 14px;
+            font-size: 0.92rem;
+            opacity: 0.72;
+            line-height: 1.5;
+        }
+        .waiting-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .waiting-setting-box {
+            padding: 14px 12px;
+            border-radius: 12px;
+            background: #3a3a3a;
+        }
+        .waiting-setting-label {
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            opacity: 0.75;
+        }
+        .waiting-setting-value {
+            font-size: 1rem;
+            font-weight: bold;
+        }
+        .waiting-setting-value--number {
+            font-size: 1.35rem;
+        }
+        .waiting-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .waiting-list-item {
+            padding: 12px 16px;
+            border-radius: 12px;
+            text-align: left;
+        }
+        .waiting-list-item--host {
+            background: rgba(255, 176, 51, 0.14);
+            border: 1px solid rgba(255, 211, 140, 0.22);
+        }
+        .waiting-list-item--guest {
+            background: rgba(113, 147, 214, 0.16);
+            border: 1px solid rgba(165, 194, 255, 0.18);
+        }
+        .waiting-list-item--placeholder {
+            border: 1px dashed rgba(255,255,255,0.35);
+            color: #ddd;
+        }
+        .waiting-item-title {
+            font-weight: bold;
+        }
+        .waiting-item-subtitle {
+            margin-top: 4px;
+            font-size: 0.94rem;
+            opacity: 0.76;
+        }
+        .waiting-note {
+            margin: 0;
+            max-width: 540px;
+            z-index: 2;
+            line-height: 1.55;
+            text-align: center;
+        }
+        .waiting-note--primary {
+            opacity: 0.84;
+        }
+        .waiting-note--secondary {
+            opacity: 0.68;
+        }
+        @media (max-width: 980px) {
+            .waiting-stage {
+                grid-template-columns: 1fr;
+                grid-template-areas:
+                    "main"
+                    "settings"
+                    "players";
+            }
+            .waiting-layout {
+                width: calc(100% - 32px);
+                padding: 0 16px;
+            }
+            .waiting-main,
+            .waiting-side,
+            .waiting-role-card,
+            .waiting-code-card {
+                width: 100%;
+            }
+        }
+        @media (max-width: 640px) {
+            .waiting-settings-grid {
+                grid-template-columns: 1fr;
+            }
+            .waiting-editor-head {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .waiting-main button,
+            .waiting-side button {
+                width: 100%;
+            }
+            .waiting-action-row {
+                width: 100%;
+            }
+            .waiting-code-block {
+                font-size: 2rem;
+                letter-spacing: 0.22rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="silhouette-bg">
+        <svg class="silhouette" viewBox="0 0 600 220">
+            <g>
+                <!-- Silhouette style: 2 figures, type code name -->
+                <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z"
+                      fill="#fff"/>
+                <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z"
+                      fill="#fff"/>
+                <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                <!-- Ombre -->
+                <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+            </g>
+        </svg>
+    </div>
+
+    <h1>Bienvenue sur Undercover !</h1>
+    <div style="display: flex; gap: 20px; margin-bottom: 30px;">
+        <button id="createSessionBtn">Créer une session</button>
+        <button id="joinSessionBtn">Rejoindre une session</button>
+    </div>
+    <button id="startBtn">Commencer (local)</button>
+
+
+    <script>
+        // Gestion des boutons de session multijoueur
+        document.addEventListener('DOMContentLoaded', function() {
+            const createBtn = document.getElementById('createSessionBtn');
+            const joinBtn = document.getElementById('joinSessionBtn');
+            const sharedSessionCode = getSessionCodeFromUrl();
+            if (createBtn) {
+                createBtn.addEventListener('click', function() {
+                    let code = createSessionCode();
+                    showWaitingRoomScreen(code, {
+                        isHost: true,
+                        settings: getDefaultSessionSettings()
+                    });
+                });
+            }
+            if (joinBtn) {
+                joinBtn.addEventListener('click', function() {
+                    showJoinSessionDialog();
+                });
+            }
+
+            if (sharedSessionCode) {
+                window.setTimeout(() => {
+                    showJoinSessionDialog(sharedSessionCode);
+                }, 120);
+            }
+        });
+
+        let sessionState = null;
+
+        function getDefaultSessionSettings() {
+            return {
+                players: 5,
+                mrWhite: true,
+                undercover: true
+            };
+        }
+
+        function createSessionCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function normalizeBooleanSetting(value, fallback) {
+            if (value === undefined || value === null || value === '') {
+                return fallback;
+            }
+
+            const normalized = String(value).trim().toLowerCase();
+            if (normalized === '0' || normalized === 'false' || normalized === 'off' || normalized === 'no') {
+                return false;
+            }
+            if (normalized === '1' || normalized === 'true' || normalized === 'on' || normalized === 'yes') {
+                return true;
+            }
+
+            return Boolean(value);
+        }
+
+        function normalizeSessionSettings(settings = {}) {
+            const defaultSettings = getDefaultSessionSettings();
+            const players = Math.min(20, Math.max(3, Number(settings.players) || defaultSettings.players));
+
+            return {
+                players: players,
+                mrWhite: normalizeBooleanSetting(settings.mrWhite, defaultSettings.mrWhite),
+                undercover: normalizeBooleanSetting(settings.undercover, defaultSettings.undercover)
+            };
+        }
+
+        function getSessionSettingsFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return normalizeSessionSettings({
+                players: params.get('players'),
+                mrWhite: params.get('mrWhite'),
+                undercover: params.get('undercover')
+            });
+        }
+
+        function renderSessionSettingsCard(settings, isHost) {
+            if (isHost) {
+                return `
+                    <div class="waiting-panel">
+                        <div class="waiting-panel-title">Parametres de session</div>
+                        <div class="waiting-editor-head">
+                            <label class="waiting-editor-label" for="sessionPlayersRange">Nombre de joueurs</label>
+                            <div class="waiting-editor-value"><span id="sessionPlayersValue">${settings.players}</span> joueurs</div>
+                        </div>
+                        <input id="sessionPlayersRange" class="waiting-range" type="range" min="3" max="20" value="${settings.players}">
+                        <div class="waiting-range-scale">
+                            <span>3</span>
+                            <span>20</span>
+                        </div>
+                        <div class="waiting-toggle-list">
+                            <label class="waiting-toggle">
+                                <input id="sessionMrWhiteCheckbox" type="checkbox" ${settings.mrWhite ? 'checked' : ''}>
+                                <span>Activer Mr. White</span>
+                            </label>
+                            <label class="waiting-toggle">
+                                <input id="sessionUndercoverCheckbox" type="checkbox" ${settings.undercover ? 'checked' : ''}>
+                                <span>Activer Undercover</span>
+                            </label>
+                        </div>
+                        <div class="waiting-editor-note">Les changements sont appliques directement a cette session.</div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="waiting-panel">
+                    <div class="waiting-panel-title">Parametres de session</div>
+                    <div class="waiting-settings-grid">
+                        <div class="waiting-setting-box">
+                            <div class="waiting-setting-label">Joueurs</div>
+                            <div class="waiting-setting-value waiting-setting-value--number">${settings.players}</div>
+                        </div>
+                        <div class="waiting-setting-box">
+                            <div class="waiting-setting-label">Mr. White</div>
+                            <div class="waiting-setting-value">${settings.mrWhite ? 'Actif' : 'Desactive'}</div>
+                        </div>
+                        <div class="waiting-setting-box">
+                            <div class="waiting-setting-label">Undercover</div>
+                            <div class="waiting-setting-value">${settings.undercover ? 'Actif' : 'Desactive'}</div>
+                        </div>
+                    </div>
+                    <div class="waiting-editor-note">Lecture seule pour les invites.</div>
+                </div>
+            `;
+        }
+
+        function renderWaitingRoomRoleCard(isHost) {
+            const badge = isHost ? 'Hote' : 'Invite';
+            const title = isHost ? 'Tu controles cette session' : "Tu attends l'hote";
+            const text = isHost
+                ? `Tu peux <strong>modifier les parametres</strong>, <strong>partager le lien</strong> et <strong>lancer la partie</strong> quand tout le monde est pret.`
+                : `Tu peux <strong>consulter le code</strong> et <strong>verifier les reglages</strong>, mais seul l'hote pourra modifier la session et lancer la partie.`;
+
+            return `
+                <div class="waiting-role-card ${isHost ? 'waiting-role-card--host' : 'waiting-role-card--guest'}">
+                    <div class="waiting-role-badge">${badge}</div>
+                    <div class="waiting-role-title">${title}</div>
+                    <p class="waiting-role-text">${text}</p>
+                </div>
+            `;
+        }
+
+        function restartAfterGame() {
+            if (sessionState && sessionState.code) {
+                showWaitingRoomScreen(sessionState.code, {
+                    isHost: sessionState.isHost,
+                    settings: sessionState.settings
+                });
+                return;
+            }
+
+            showWaitingRoomScreen(createSessionCode(), {
+                isHost: true,
+                settings: getDefaultSessionSettings()
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function createDialog(content, wide = false) {
+            const overlay = document.createElement('div');
+            overlay.className = 'dialog-overlay';
+            overlay.innerHTML = `
+                <div class="dialog-card ${wide ? 'dialog-card--wide' : ''}">
+                    ${content}
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            return overlay;
+        }
+
+        function closeDialog(overlay) {
+            if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast-message';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            window.setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 2200);
+        }
+
+        function showInfoDialog(title, message, buttonLabel = 'Fermer') {
+            const overlay = createDialog(`
+                <div class="dialog-kicker">Information</div>
+                <h3>${escapeHtml(title)}</h3>
+                <p>${message}</p>
+                <div class="dialog-actions">
+                    <button id="infoDialogCloseBtn" type="button">${escapeHtml(buttonLabel)}</button>
+                </div>
+            `);
+
+            document.getElementById('infoDialogCloseBtn').addEventListener('click', function() {
+                closeDialog(overlay);
+            });
+        }
+
+        function showCopyFallbackDialog(title, helpText, value) {
+            const overlay = createDialog(`
+                <div class="dialog-kicker">Copie manuelle</div>
+                <h3>${escapeHtml(title)}</h3>
+                <p>${escapeHtml(helpText)}</p>
+                <input id="fallbackCopyInput" class="dialog-readonly" type="text" readonly value="${escapeHtml(value)}">
+                <div class="dialog-help">Le texte est selectionne automatiquement pour faciliter la copie.</div>
+                <div class="dialog-actions">
+                    <button id="fallbackCloseBtn" type="button">Fermer</button>
+                </div>
+            `, true);
+
+            const input = document.getElementById('fallbackCopyInput');
+            input.focus();
+            input.select();
+
+            document.getElementById('fallbackCloseBtn').addEventListener('click', function() {
+                closeDialog(overlay);
+            });
+        }
+
+        function getSessionShareUrl(code) {
+            const url = new URL(window.location.href);
+            const settings = normalizeSessionSettings(
+                sessionState && sessionState.code === code
+                    ? sessionState.settings
+                    : getDefaultSessionSettings()
+            );
+            url.searchParams.set('session', code);
+            url.searchParams.set('players', String(settings.players));
+            url.searchParams.set('mrWhite', settings.mrWhite ? '1' : '0');
+            url.searchParams.set('undercover', settings.undercover ? '1' : '0');
+            return url.toString();
+        }
+
+        function getSessionCodeFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('session');
+            return code ? code.trim().toUpperCase() : '';
+        }
+
+        function showShareSessionDialog(code) {
+            const shareUrl = getSessionShareUrl(code);
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(shareUrl)}`;
+            const localFileNote = window.location.protocol === 'file:'
+                ? `Le lien genere actuellement une adresse locale <b>file://</b>. Pour qu'il fonctionne sur un autre appareil via QR code ou Discord, ouvre plutot la page via un serveur local ou un hebergement en ligne.`
+                : `Scanne le QR code ou copie le lien ci-dessous pour l'envoyer sur Discord, WhatsApp ou ailleurs.`;
+
+            const overlay = createDialog(`
+                <div class="dialog-kicker">Partager la session</div>
+                <h3>Session ${escapeHtml(code)}</h3>
+                <div class="qr-preview">
+                    <img class="qr-image" src="${qrUrl}" alt="QR code de la session ${escapeHtml(code)}">
+                </div>
+                <input id="sessionShareLinkInput" class="dialog-readonly" type="text" readonly value="${escapeHtml(shareUrl)}">
+                <div class="dialog-help">Le lien contient deja le code de session.</div>
+                <div class="dialog-actions">
+                    <button id="copySessionLinkBtn" type="button">Copier le lien</button>
+                    <button id="closeSessionShareBtn" type="button" class="button-secondary">Fermer</button>
+                </div>
+                <div class="dialog-note">${localFileNote}</div>
+            `, true);
+
+            const input = document.getElementById('sessionShareLinkInput');
+            input.addEventListener('click', function() {
+                input.select();
+            });
+
+            document.getElementById('copySessionLinkBtn').addEventListener('click', async function() {
+                try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    showToast('Lien de session copie.');
+                } catch (error) {
+                    input.focus();
+                    input.select();
+                    showToast('Selectionne puis copie le lien manuellement.');
+                }
+            });
+
+            document.getElementById('closeSessionShareBtn').addEventListener('click', function() {
+                closeDialog(overlay);
+            });
+        }
+
+        function showJoinSessionDialog(initialCode = '') {
+            const overlay = createDialog(`
+                <div class="dialog-kicker">Rejoindre une session</div>
+                <h3>Entre le code</h3>
+                <p>Saisis le code partage par l'hote pour tenter de rejoindre sa partie.</p>
+                <input id="joinSessionCodeInput" class="dialog-input" type="text" maxlength="10" placeholder="Exemple : A1B2C3" value="${escapeHtml(initialCode)}">
+                <div id="joinSessionError" class="dialog-error" style="display:none;"></div>
+                <div class="dialog-actions">
+                    <button id="joinSessionConfirmBtn" type="button">Continuer</button>
+                    <button id="joinSessionCancelBtn" type="button" class="button-secondary">Annuler</button>
+                </div>
+            `);
+
+            const input = document.getElementById('joinSessionCodeInput');
+            const errorBox = document.getElementById('joinSessionError');
+
+            input.focus();
+            input.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    submitJoinCode();
+                }
+            });
+
+            document.getElementById('joinSessionConfirmBtn').addEventListener('click', submitJoinCode);
+            document.getElementById('joinSessionCancelBtn').addEventListener('click', function() {
+                closeDialog(overlay);
+            });
+
+            function submitJoinCode() {
+                const code = input.value.trim().toUpperCase();
+                if (!code) {
+                    errorBox.textContent = 'Entre un code de session avant de continuer.';
+                    errorBox.style.display = 'block';
+                    input.focus();
+                    return;
+                }
+
+                closeDialog(overlay);
+                showWaitingRoomScreen(code, {
+                    isHost: false,
+                    settings: getSessionSettingsFromUrl()
+                });
+            }
+        }
+
+        function showWaitingRoomScreen(code) {
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Salle d'attente</h2>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:18px;max-width:520px;padding:0 24px;text-align:center;z-index:2;">
+                    <p style="margin:0;font-size:1.1rem;">Partage ce code pour que les joueurs puissent rejoindre la partie.</p>
+                    <div style="padding:18px 28px;border-radius:16px;background:#333;box-shadow:0 8px 24px #0003;font-size:2.4rem;font-weight:bold;letter-spacing:0.35rem;z-index:2;">${code}</div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;z-index:2;">
+                        <button id="copySessionCodeBtn" type="button">Copier le code</button>
+                        <button id="shareSessionCodeBtn" type="button">Partager</button>
+                    </div>
+                    <div style="width:min(100%,360px);padding:22px;border-radius:16px;background:#2d2d2d;box-shadow:0 8px 24px #0003;z-index:2;">
+                        <div style="font-size:1.1rem;font-weight:bold;margin-bottom:12px;">Joueurs présents</div>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            <div style="padding:12px 16px;border-radius:10px;background:#3a3a3a;">Vous (hôte)</div>
+                            <div style="padding:12px 16px;border-radius:10px;border:1px dashed rgba(255,255,255,0.35);color:#ddd;">En attente d'autres joueurs...</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;z-index:2;">
+                        <button id="configureSessionBtn" type="button">Configurer la partie</button>
+                        <button id="backHomeBtn" type="button">Retour</button>
+                    </div>
+                    <p style="margin:0;max-width:460px;opacity:0.8;z-index:2;">Le mode réseau n'est pas encore branché : cet écran permet déjà de partager le code et de préparer la partie.</p>
+                </div>
+            `;
+
+            document.getElementById('copySessionCodeBtn').addEventListener('click', async function() {
+                try {
+                    await navigator.clipboard.writeText(code);
+                    this.textContent = 'Code copie';
+                    showToast('Code de session copie.');
+                } catch (error) {
+                    showCopyFallbackDialog('Code de session', 'Copie ce code pour le partager aux autres joueurs.', code);
+                }
+            });
+
+            document.getElementById('shareSessionCodeBtn').addEventListener('click', async function() {
+                showShareSessionDialog(code);
+            });
+
+            document.getElementById('configureSessionBtn').addEventListener('click', showOptionsScreen);
+            document.getElementById('backHomeBtn').addEventListener('click', function() {
+                window.location.reload();
+            });
+        }
+
+        // Affiche l'écran des options
+        function showOptionsScreen() {
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Options de jeu</h2>
+                <form id="optionsForm">
+                    <label for="players">Nombre de joueurs :</label>
+                    <input type="number" id="players" name="players" min="3" max="20" value="5" required>
+                    <label>
+                        <input type="checkbox" id="mrWhite" name="mrWhite" checked>
+                        Intégrer Mr. White
+                    </label>
+                    <label>
+                        <input type="checkbox" id="undercover" name="undercover" checked>
+                        Intégrer Undercover
+                    </label>
+                    <button type="submit" id="validerBtn" style="margin-top:30px;">Valider</button>
+                </form>
+            `;
+            attachOptionsFormListener();
+        }
+
+        // Affiche l'écran de sélection des cartes
+        async function showCardsScreen(nbJoueurs, mrWhite, undercover) {
+            const motsFrancais = [
+                "chat", "chien", "maison", "voiture", "pain", "eau", "livre", "arbre", "soleil", "lune",
+                "porte", "table", "fleur", "route", "montagne", "mer", "pomme", "banane", "fromage", "clé",
+                "fenêtre", "chaise", "camion", "bus", "train", "avion", "plage", "forêt", "rue", "ville",
+                "ordinateur", "musique", "film", "photo", "journal", "stylo", "papier", "crayon", "bouteille", "verre",
+                "téléphone", "lampe", "couteau", "fourchette", "cuillère", "assiette", "serviette", "chaussure", "veste", "pantalon"
+            ];
+
+            const motCivil = motsFrancais[Math.floor(Math.random() * motsFrancais.length)];
+            let motUndercover;
+            let tries = 0;
+            do {
+                motUndercover = motsFrancais[Math.floor(Math.random() * motsFrancais.length)];
+                tries++;
+                if (tries > 10) break;
+            } while (motUndercover === motCivil);
+
+            let roles = [];
+            let nbMrWhite = mrWhite ? 1 : 0;
+            let nbUndercover = undercover ? 1 : 0;
+            let nbCivils = nbJoueurs - nbMrWhite - nbUndercover;
+
+            for(let i=0; i<nbCivils; i++) roles.push({role: "civil", mot: motCivil});
+            if(nbUndercover) roles.push({role: "undercover", mot: motUndercover});
+            if(nbMrWhite) roles.push({role: "mrwhite", mot: null});
+            roles = roles.sort(() => Math.random() - 0.5);
+
+            let cardsHtml = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Distribution des cartes</h2>
+                <div id="cardsContainer" style="display:flex;flex-wrap:wrap;justify-content:center;">
+            `;
+            for(let i=0; i<nbJoueurs; i++) {
+                cardsHtml += `
+                    <div class="card" data-role="${roles[i].role}" data-mot="${roles[i].mot || ''}" style="width:120px;height:180px;background:#444;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:15px;font-size:3rem;cursor:pointer;box-shadow:0 4px 12px #0003;transition:transform 0.2s;">
+                        <span>?</span>
+                    </div>
+                `;
+            }
+            cardsHtml += '</div>';
+
+            document.body.innerHTML = cardsHtml;
+
+            document.querySelectorAll('.card').forEach(card => {
+                card.addEventListener('mouseover', () => card.style.transform = 'scale(1.05)');
+                card.addEventListener('mouseout', () => card.style.transform = 'scale(1)');
+            });
+
+            let joueurs = [];
+            let turnState = {
+                currentIndex: 0,
+                choosingIndex: null,
+                lastSubmittedIndex: null,
+                popupOpen: false,
+                pendingTimeout: null
+            };
+
+            document.querySelectorAll('.card').forEach((card, idx) => {
+                card.addEventListener('mouseover', () => card.style.transform = 'scale(1.05)');
+                card.addEventListener('mouseout', () => card.style.transform = 'scale(1)');
+                card.addEventListener('click', function() {
+                    if (this.classList.contains('taken')) return;
+                    openCardFlow(this, idx);
+                });
+            });
+
+            function openCardFlow(cardElement, idx) {
+                const role = cardElement.getAttribute('data-role');
+                const mot = cardElement.getAttribute('data-mot');
+                let pseudo = '';
+
+                const overlay = document.createElement('div');
+                overlay.className = 'dialog-overlay';
+                document.body.appendChild(overlay);
+
+                renderPseudoStep();
+
+                function renderPseudoStep(errorMessage = '') {
+                    overlay.innerHTML = `
+                        <div class="dialog-card">
+                            <div class="dialog-kicker">Carte ${idx + 1}</div>
+                            <h3>Entre ton pseudo</h3>
+                            <p>Ce pseudo sera affiche sur la carte une fois ton mot memorise.</p>
+                            <input id="cardPseudoInput" class="dialog-input" type="text" maxlength="12" placeholder="Ton pseudo" value="${escapeHtml(pseudo)}">
+                            ${errorMessage ? `<div class="dialog-error">${escapeHtml(errorMessage)}</div>` : ''}
+                            <div class="dialog-actions">
+                                <button id="confirmPseudoBtn" type="button">Voir mon mot</button>
+                                <button id="cancelPseudoBtn" type="button" class="button-secondary">Annuler</button>
+                            </div>
+                        </div>
+                    `;
+
+                    const input = document.getElementById('cardPseudoInput');
+                    input.focus();
+                    input.select();
+
+                    input.addEventListener('keydown', function(event) {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            validatePseudo();
+                        }
+                    });
+
+                    document.getElementById('confirmPseudoBtn').addEventListener('click', validatePseudo);
+                    document.getElementById('cancelPseudoBtn').addEventListener('click', closeOverlay);
+                }
+
+                function validatePseudo() {
+                    const input = document.getElementById('cardPseudoInput');
+                    const value = input.value.trim().substring(0, 12);
+
+                    if (!value) {
+                        renderPseudoStep('Entre un pseudo avant de continuer.');
+                        return;
+                    }
+
+                    const alreadyUsed = joueurs.some((joueur, joueurIdx) => {
+                        return joueurIdx !== idx && joueur && joueur.pseudo.toLowerCase() === value.toLowerCase();
+                    });
+
+                    if (alreadyUsed) {
+                        renderPseudoStep('Ce pseudo est deja utilise.');
+                        return;
+                    }
+
+                    pseudo = value;
+                    renderWordStep();
+                }
+
+                function renderWordStep() {
+                    let title = 'Carte secrete';
+                    let message = '';
+
+                    if (role === 'civil') {
+                        message = `Ton mot : <b>${escapeHtml(mot)}</b>`;
+                    } else if (role === 'undercover') {
+                        message = `Ton mot : <b>${escapeHtml(mot)}</b>`;
+                    } else if (role === 'mrwhite') {
+                        message = `<b>Force a toi MrWhite !</b><br><i>Tu n'as pas de mot.</i>`;
+                    }
+
+                    overlay.innerHTML = `
+                        <div class="dialog-card">
+                            <div class="dialog-kicker">${escapeHtml(pseudo)}</div>
+                            <h3>${title}</h3>
+                            <div class="dialog-word">${message}</div>
+                            <p>Memorise bien ton mot avant de fermer cette carte.</p>
+                            <div class="dialog-actions">
+                                <button id="confirmWordBtn" type="button">J'ai memorise</button>
+                            </div>
+                        </div>
+                    `;
+
+                    document.getElementById('confirmWordBtn').addEventListener('click', function() {
+                        joueurs[idx] = {
+                            pseudo,
+                            role,
+                            mot,
+                            eliminer: false,
+                            motPropose: ''
+                        };
+
+                        cardElement.innerHTML = `<span style="font-size:1.2rem; word-break:break-all; text-align:center; max-width:100px; overflow:hidden;">${escapeHtml(pseudo)}</span>`;
+                        cardElement.classList.add('taken');
+                        cardElement.style.cursor = 'default';
+                        closeOverlay();
+
+                        if (document.querySelectorAll('.card.taken').length === nbJoueurs) {
+                            if (!document.getElementById('startGameBtn')) {
+                                let btn = document.createElement('button');
+                                btn.id = 'startGameBtn';
+                                btn.textContent = 'Lancer la partie';
+                                btn.style.marginTop = '40px';
+                                btn.style.fontSize = '1.3rem';
+                                btn.style.background = '#4caf50';
+                                btn.style.borderRadius = '8px';
+                                btn.style.padding = '15px 40px';
+                                btn.style.color = '#fff';
+                                btn.style.border = 'none';
+                                btn.style.cursor = 'pointer';
+                                document.body.appendChild(btn);
+
+                                btn.addEventListener('click', function() {
+                                    showGameScreen(joueurs, mrWhite, undercover);
+                                });
+                            }
+                        }
+                    });
+                }
+
+                function closeOverlay() {
+                    if (overlay.parentNode) {
+                        overlay.parentNode.removeChild(overlay);
+                    }
+                }
+            }
+
+            function allPlayersSubmittedWord() {
+                return joueurs.length > 0 && joueurs.every(joueur => joueur && joueur.motPropose && joueur.motPropose.trim() !== '');
+            }
+
+            function findNextPlayerWithoutWord(startIndex = -1) {
+                for (let step = 1; step <= joueurs.length; step++) {
+                    const idx = (startIndex + step) % joueurs.length;
+                    if (!joueurs[idx].motPropose || joueurs[idx].motPropose.trim() === '') {
+                        return idx;
+                    }
+                }
+                return null;
+            }
+
+            function openTurnWordDialog(mrWhiteActive = mrWhite, undercoverActive = undercover) {
+                const idx = turnState.currentIndex;
+                if (idx === null || idx === undefined) return;
+
+                const joueur = joueurs[idx];
+                turnState.popupOpen = true;
+                const overlay = createDialog(`
+                    <div class="dialog-kicker">Tour de ${escapeHtml(joueur.pseudo)}</div>
+                    <h3>Propose ton mot</h3>
+                    <p>Entre un mot ou un indice court. Il sera montre aux autres joueurs des que tu le valides.</p>
+                    <input id="turnWordInput" class="dialog-input" type="text" maxlength="24" placeholder="Exemple : rapide">
+                    <div id="turnWordError" class="dialog-error" style="display:none;"></div>
+                    <div class="dialog-actions">
+                        <button id="turnWordConfirmBtn" type="button">Valider le mot</button>
+                    </div>
+                `);
+
+                const input = document.getElementById('turnWordInput');
+                const errorBox = document.getElementById('turnWordError');
+                input.focus();
+
+                input.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        submitTurnWord();
+                    }
+                });
+
+                document.getElementById('turnWordConfirmBtn').addEventListener('click', submitTurnWord);
+
+                function submitTurnWord() {
+                    const value = input.value.trim().substring(0, 24);
+
+                    if (!value) {
+                        errorBox.textContent = 'Entre un mot avant de valider.';
+                        errorBox.style.display = 'block';
+                        input.focus();
+                        return;
+                    }
+
+                    joueur.motPropose = value;
+                    turnState.popupOpen = false;
+                    turnState.choosingIndex = null;
+                    turnState.lastSubmittedIndex = idx;
+                    turnState.currentIndex = findNextPlayerWithoutWord(idx);
+                    closeDialog(overlay);
+                    showGameScreen(joueurs, mrWhiteActive, undercoverActive);
+                }
+            }
+
+            function showGameScreen(joueurs, mrWhiteActive = mrWhite, undercoverActive = undercover) {
+                joueurs.forEach(j => {
+                    if (j.eliminer === undefined) j.eliminer = false;
+                    if (j.motPropose === undefined) j.motPropose = '';
+                });
+
+                if (turnState.pendingTimeout) {
+                    clearTimeout(turnState.pendingTimeout);
+                    turnState.pendingTimeout = null;
+                }
+
+                if (checkEndGame(joueurs)) return;
+
+                const allWordsDone = allPlayersSubmittedWord();
+                if (!allWordsDone) {
+                    if (turnState.currentIndex === null || turnState.currentIndex === undefined || (joueurs[turnState.currentIndex] && joueurs[turnState.currentIndex].motPropose)) {
+                        turnState.currentIndex = findNextPlayerWithoutWord(turnState.currentIndex ?? -1);
+                    }
+                } else {
+                    turnState.currentIndex = null;
+                    turnState.choosingIndex = null;
+                    turnState.popupOpen = false;
+                }
+
+                const currentTurnPlayer = turnState.currentIndex !== null && turnState.currentIndex !== undefined
+                    ? joueurs[turnState.currentIndex]
+                    : null;
+                const choosingPlayer = turnState.choosingIndex !== null && turnState.choosingIndex !== undefined
+                    ? joueurs[turnState.choosingIndex]
+                    : null;
+
+                let turnStatus = '';
+                if (allWordsDone) {
+                    if (turnState.lastSubmittedIndex !== null && turnState.lastSubmittedIndex !== undefined) {
+                        const lastPlayer = joueurs[turnState.lastSubmittedIndex];
+                        turnStatus = `${lastPlayer.pseudo} a valide le mot "${lastPlayer.motPropose}". Tous les joueurs ont propose un mot. Vous pouvez maintenant passer aux identifications.`;
+                    } else {
+                        turnStatus = "Tous les joueurs ont propose un mot. Vous pouvez maintenant passer aux identifications.";
+                    }
+                } else if (choosingPlayer) {
+                    turnStatus = `${choosingPlayer.pseudo} choisit son mot...`;
+                } else if (turnState.lastSubmittedIndex !== null && turnState.lastSubmittedIndex !== undefined) {
+                    const lastPlayer = joueurs[turnState.lastSubmittedIndex];
+                    turnStatus = `${lastPlayer.pseudo} a valide le mot "${lastPlayer.motPropose}".`;
+                } else if (currentTurnPlayer) {
+                    turnStatus = `${currentTurnPlayer.pseudo} choisit son mot...`;
+                }
+
+                if (!allWordsDone && turnState.choosingIndex === null && turnState.lastSubmittedIndex === null && currentTurnPlayer) {
+                    turnState.choosingIndex = turnState.currentIndex;
+                    turnStatus = `${currentTurnPlayer.pseudo} choisit son mot...`;
+                }
+
+                let html = `
+                    <div class="silhouette-bg">
+                        <svg class="silhouette" viewBox="0 0 600 220">
+                            <g>
+                                <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                                <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                                <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                                <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                                <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                            </g>
+                        </svg>
+                    </div>
+                    <h2>Partie en cours</h2>
+                    <div style="width:min(100%,760px);background:#2d2d2d;border-radius:18px;box-shadow:0 8px 24px #0003;padding:24px 22px;margin-bottom:26px;z-index:2;">
+                        <div style="font-size:1.35rem;font-weight:bold;margin-bottom:10px;">Tour des mots</div>
+                        <div style="font-size:1.05rem;line-height:1.5;color:#f1f1f1;margin-bottom:18px;">${turnStatus}</div>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            ${joueurs.map((joueur, idx) => {
+                                let statusLabel = '<span style="opacity:0.7;">En attente</span>';
+                                if (joueur.motPropose) {
+                                    statusLabel = `<span style="font-weight:bold;color:#fff;">${escapeHtml(joueur.motPropose)}</span>`;
+                                } else if (!allWordsDone && turnState.choosingIndex === idx) {
+                                    statusLabel = `<span style="color:#ffd180;">${escapeHtml(joueur.pseudo)} choisit son mot...</span>`;
+                                } else if (!allWordsDone && turnState.currentIndex === idx) {
+                                    statusLabel = '<span style="color:#ffe082;">Son tour arrive maintenant</span>';
+                                }
+
+                                return `
+                                    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border-radius:12px;background:#3a3a3a;">
+                                        <span style="font-size:1rem;${joueur.eliminer ? 'text-decoration:line-through;color:#aaa;' : 'color:#fff;'}">${escapeHtml(joueur.pseudo)}</span>
+                                        <span style="font-size:0.98rem;text-align:right;">${statusLabel}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;">
+                `;
+                joueurs.forEach((joueur, idx) => {
+                    html += `
+                        <div style="display:flex;align-items:center;margin-bottom:20px;">
+                            <span class="pseudo-joueur" data-idx="${idx}" style="font-size:1.2rem;margin-right:30px;${joueur.eliminer ? 'text-decoration: line-through; color: #aaa;' : ''}">${joueur.pseudo}</span>
+                            <button class="identifierBtn" data-idx="${idx}" style="padding:8px 24px;font-size:1rem;border:none;border-radius:8px;background:${allWordsDone ? '#ff9800' : '#777'};color:#fff;cursor:${allWordsDone && !joueur.eliminer ? 'pointer' : 'not-allowed'};opacity:${joueur.eliminer || !allWordsDone ? '0.65' : '1'};" ${joueur.eliminer || !allWordsDone ? 'disabled' : ''}>${allWordsDone ? 'Identifier' : 'Attendre le tour'}</button>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                document.body.innerHTML = html;
+
+                if (!allWordsDone && turnState.lastSubmittedIndex !== null && turnState.currentIndex !== null) {
+                    turnState.pendingTimeout = window.setTimeout(() => {
+                        turnState.lastSubmittedIndex = null;
+                        turnState.choosingIndex = turnState.currentIndex;
+                        showGameScreen(joueurs, mrWhiteActive, undercoverActive);
+                    }, 1800);
+                } else if (!allWordsDone && turnState.choosingIndex !== null && !turnState.popupOpen) {
+                    turnState.pendingTimeout = window.setTimeout(() => {
+                        if (!turnState.popupOpen && turnState.choosingIndex !== null && !allPlayersSubmittedWord()) {
+                            openTurnWordDialog(mrWhiteActive, undercoverActive);
+                        }
+                    }, 80);
+                }
+
+                document.querySelectorAll('.identifierBtn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        let idx = parseInt(this.getAttribute('data-idx'), 10);
+                        let popup = document.createElement('div');
+                        popup.style.position = 'fixed';
+                        popup.style.top = '0';
+                        popup.style.left = '0';
+                        popup.style.width = '100vw';
+                        popup.style.height = '100vh';
+                        popup.style.background = 'rgba(0,0,0,0.7)';
+                        popup.style.display = 'flex';
+                        popup.style.justifyContent = 'center';
+                        popup.style.alignItems = 'center';
+                        popup.style.zIndex = '9999';
+
+                        // Génération dynamique des boutons selon les rôles actifs
+                        let btns = '';
+                        if (mrWhiteActive) {
+                            btns += '<button id="idWhite" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#2196f3;color:#fff;cursor:pointer;margin-right:10px;">Identifier MrWhite</button>';
+                        }
+                        if (undercoverActive) {
+                            btns += '<button id="idUndercover" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#ff9800;color:#fff;cursor:pointer;">Identifier Undercover</button>';
+                        }
+
+                        popup.innerHTML = `
+                            <div style="background:#fff;color:#222;padding:40px 30px;border-radius:16px;box-shadow:0 8px 32px #0007;text-align:center;min-width:220px;">
+                                <div style="margin-bottom:30px;font-size:1.2rem;">Identifier ${joueurs[idx].pseudo} :</div>
+                                ${btns}
+                                <br><br>
+                                <button id="closePopup" style="padding:8px 24px;font-size:1rem;border:none;border-radius:8px;background:#888;color:#fff;cursor:pointer;margin-top:20px;">Annuler</button>
+                            </div>
+                        `;
+
+                        document.body.appendChild(popup);
+
+                        document.getElementById('closePopup').addEventListener('click', function() {
+                            document.body.removeChild(popup);
+                        });
+
+                        const idWhiteBtn = document.getElementById('idWhite');
+                        if (idWhiteBtn) {
+                            idWhiteBtn.addEventListener('click', function() {
+                                document.body.removeChild(popup);
+                                if (joueurs[idx].role === "mrwhite") {
+                                    joueurs[idx].eliminer = true;
+                                    let decipherPopup = document.createElement('div');
+                                    decipherPopup.style.position = 'fixed';
+                                    decipherPopup.style.top = '0';
+                                    decipherPopup.style.left = '0';
+                                    decipherPopup.style.width = '100vw';
+                                    decipherPopup.style.height = '100vh';
+                                    decipherPopup.style.background = 'rgba(0,0,0,0.7)';
+                                    decipherPopup.style.display = 'flex';
+                                    decipherPopup.style.justifyContent = 'center';
+                                    decipherPopup.style.alignItems = 'center';
+                                    decipherPopup.style.zIndex = '9999';
+
+                                    decipherPopup.innerHTML = `
+                                        <div style="background:#fff;color:#222;padding:40px 30px;border-radius:16px;box-shadow:0 8px 32px #0007;text-align:center;min-width:220px;">
+                                            <div style="margin-bottom:30px;font-size:1.3rem;">
+                                                <b>MrWhite à été détecté !</b><br>
+                                                <span style="font-size:1.1rem;">Tentez de déchiffrer le mot secret :</span>
+                                            </div>
+                                            <input type="text" id="guessWord" placeholder="Votre proposition..." style="padding:10px;font-size:1rem;border-radius:8px;border:1px solid #ccc;margin-bottom:20px;width:80%;">
+                                            <button id="submitGuess" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#4caf50;color:#fff;cursor:pointer;margin-bottom:10px;">Valider</button>
+                                            <br>
+                                            <button id="closeDecipherPopup" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#222;color:#fff;cursor:pointer;">Fermer</button>
+                                        </div>
+                                    `;
+                                    document.body.appendChild(decipherPopup);
+
+                                    document.getElementById('closeDecipherPopup').addEventListener('click', function() {
+                                        document.body.removeChild(decipherPopup);
+                                        showGameScreen(joueurs);
+                                    });
+
+                                    document.getElementById('submitGuess').addEventListener('click', function() {
+                                        const motCivil = joueurs.find(j => j.role === "civil")?.mot;
+                                        const guess = document.getElementById('guessWord').value.trim().toLowerCase();
+                                        let resultMsg;
+                                        if (motCivil && guess === motCivil.toLowerCase()) {
+                                            resultMsg = `<b>Bravo !</b> MrWhite a trouvé le mot secret : <span style="color:#4caf50">${motCivil}</span>`;
+                                        } else {
+                                            resultMsg = `<b>Dommage !</b> Ce n'était pas le mot secret.`;
+                                        }
+                                        document.getElementById('guessWord').disabled = true;
+                                        document.getElementById('submitGuess').disabled = true;
+                                        let resultDiv = document.createElement('div');
+                                        resultDiv.innerHTML = `<div style="margin-top:20px;font-size:1.2rem;">${resultMsg}</div>`;
+                                        decipherPopup.querySelector('div').appendChild(resultDiv);
+                                    });
+                                } else {
+                                    joueurs[idx].eliminer = true;
+                                    showResultPopup("MrWhite se cache encore parmi vous ! Ce joueur est éliminé.", "#ff9800", joueurs);
+                                }
+                            });
+                        }
+
+                        const idUndercoverBtn = document.getElementById('idUndercover');
+                        if (idUndercoverBtn) {
+                            idUndercoverBtn.addEventListener('click', function() {
+                                document.body.removeChild(popup);
+                                if (joueurs[idx].role === "undercover") {
+                                    joueurs[idx].eliminer = true;
+                                    const mrWhiteAlive = joueurs.some(j => j.role === "mrwhite" && !j.eliminer);
+
+                                    let message = `<b>L'Undercover a été détecté !</b><br><span style="font-size:1.1rem;">Victoire des Civils !</span>`;
+                                    if (mrWhiteAlive) {
+                                        message += `<br><span style="color:#d32f2f;font-size:1.1rem;">MrWhite n'a pas été trouvé !</span>`;
+                                    }
+
+                                    let endPopup = document.createElement('div');
+                                    endPopup.style.position = 'fixed';
+                                    endPopup.style.top = '0';
+                                    endPopup.style.left = '0';
+                                    endPopup.style.width = '100vw';
+                                    endPopup.style.height = '100vh';
+                                    endPopup.style.background = 'rgba(0,0,0,0.7)';
+                                    endPopup.style.display = 'flex';
+                                    endPopup.style.justifyContent = 'center';
+                                    endPopup.style.alignItems = 'center';
+                                    endPopup.style.zIndex = '9999';
+                                    endPopup.innerHTML = `
+                                        <div style="background:#4caf50;color:#fff;padding:40px 30px;border-radius:16px;box-shadow:0 8px 32px #0007;text-align:center;min-width:220px;">
+                                            <div style="margin-bottom:30px;font-size:1.5rem;">${message}</div>
+                                            <button id="closeEndPopup" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#222;color:#fff;cursor:pointer;">Nouvelle partie</button>
+                                        </div>
+                                    `;
+                                    document.body.appendChild(endPopup);
+                                    document.getElementById('closeEndPopup').addEventListener('click', function() {
+                                        document.body.removeChild(endPopup);
+                                        restartAfterGame();
+                                    });
+                                } else {
+                                    joueurs[idx].eliminer = true;
+                                    showResultPopup("L'Undercover se cache encore parmi vous ! Ce joueur est éliminé.", "#ff9800", joueurs);
+                                }
+                            });
+                        }
+
+                        function showResultPopup(message, color, joueurs) {
+                            let resultPopup = document.createElement('div');
+                            resultPopup.style.position = 'fixed';
+                            resultPopup.style.top = '0';
+                            resultPopup.style.left = '0';
+                            resultPopup.style.width = '100vw';
+                            resultPopup.style.height = '100vh';
+                            resultPopup.style.background = 'rgba(0,0,0,0.7)';
+                            resultPopup.style.display = 'flex';
+                            resultPopup.style.justifyContent = 'center';
+                            resultPopup.style.alignItems = 'center';
+                            resultPopup.style.zIndex = '9999';
+                            resultPopup.innerHTML = `
+                                <div style="background:#fff;color:#222;padding:40px 30px;border-radius:16px;box-shadow:0 8px 32px #0007;text-align:center;min-width:220px;">
+                                    <div style="margin-bottom:30px;font-size:1.3rem;">${message}</div>
+                                    <button id="closeResultPopup" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:${color};color:#fff;cursor:pointer;">Fermer</button>
+                                </div>
+                            `;
+                            document.body.appendChild(resultPopup);
+                            document.getElementById('closeResultPopup').addEventListener('click', function() {
+                                document.body.removeChild(resultPopup);
+                                showGameScreen(joueurs);
+                            });
+                        }
+                    });
+                });
+
+                function checkEndGame(joueurs) {
+                    const civilsAlive = joueurs.filter(j => j.role === "civil" && !j.eliminer).length;
+                    const undercoverAlive = joueurs.some(j => j.role === "undercover" && !j.eliminer);
+                    const mrWhiteAlive = joueurs.some(j => j.role === "mrwhite" && !j.eliminer);
+
+                    if (civilsAlive === 0 && (undercoverAlive || mrWhiteAlive)) {
+                        let message = "";
+                        if (undercoverAlive && mrWhiteAlive) {
+                            message = `<b>Victoire de MrWhite et de l'Undercover !</b><br><span style="font-size:1.1rem;">Les rôles spéciaux ont gagné ensemble !</span>`;
+                        } else if (undercoverAlive) {
+                            message = `<b>Victoire de l'Undercover !</b><br><span style="font-size:1.1rem;">L'Undercover a su tromper tout le monde !</span>`;
+                        } else if (mrWhiteAlive) {
+                            message = `<b>Victoire de MrWhite !</b><br><span style="font-size:1.1rem;">MrWhite a su rester caché jusqu'au bout !</span>`;
+                        }
+                        showEndGamePopup(message, "#d32f2f");
+                        return true;
+                    }
+                    else if (!undercoverAlive && !mrWhiteAlive && civilsAlive > 0) {
+                        let message = `<b>Victoire des Civils !</b><br><span style="font-size:1.1rem;">Les rôles spéciaux ont été démasqués !</span>`;
+                        showEndGamePopup(message, "#4caf50");
+                        return true;
+                    }
+                    return false;
+                }
+
+                function showEndGamePopup(message, color) {
+                    let endPopup = document.createElement('div');
+                    endPopup.style.position = 'fixed';
+                    endPopup.style.top = '0';
+                    endPopup.style.left = '0';
+                    endPopup.style.width = '100vw';
+                    endPopup.style.height = '100vh';
+                    endPopup.style.background = 'rgba(0,0,0,0.7)';
+                    endPopup.style.display = 'flex';
+                    endPopup.style.justifyContent = 'center';
+                    endPopup.style.alignItems = 'center';
+                    endPopup.style.zIndex = '9999';
+                    endPopup.innerHTML = `
+                        <div style="background:${color};color:#fff;padding:40px 30px;border-radius:16px;box-shadow:0 8px 32px #0007;text-align:center;min-width:220px;">
+                            <div style="margin-bottom:30px;font-size:1.5rem;">${message}</div>
+                            <button id="closeEndPopup" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#222;color:#fff;cursor:pointer;">Nouvelle partie</button>
+                        </div>
+                    `;
+                    document.body.appendChild(endPopup);
+                    document.getElementById('closeEndPopup').addEventListener('click', function() {
+                        document.body.removeChild(endPopup);
+                        restartAfterGame();
+                    });
+                }
+            }
+        }
+
+        function showWaitingRoomScreen(code, options = {}) {
+            const previousState = sessionState && sessionState.code === code ? sessionState : null;
+            sessionState = {
+                code: code,
+                isHost: typeof options.isHost === 'boolean'
+                    ? options.isHost
+                    : (previousState ? previousState.isHost : true),
+                settings: normalizeSessionSettings(
+                    options.settings
+                    || (previousState ? previousState.settings : getDefaultSessionSettings())
+                )
+            };
+
+            const settings = sessionState.settings;
+            const isHost = sessionState.isHost;
+            const actionButtons = isHost
+                ? `
+                    <button id="launchSessionBtn" type="button">Lancer la partie</button>
+                    <button id="backHomeBtn" type="button" class="button-secondary">Retour</button>
+                `
+                : `
+                    <button type="button" disabled style="opacity:0.55;cursor:not-allowed;">Lancement reserve a l'hote</button>
+                    <button id="backHomeBtn" type="button" class="button-secondary">Retour</button>
+                `;
+
+            const playersBlock = isHost
+                ? `
+                    <div class="waiting-list-item waiting-list-item--host">
+                        <div class="waiting-item-title">Vous (hote)</div>
+                        <div class="waiting-item-subtitle">Controle des reglages et lancement de la partie.</div>
+                    </div>
+                    <div class="waiting-list-item waiting-list-item--placeholder">
+                        <div class="waiting-item-title">Places disponibles</div>
+                        <div class="waiting-item-subtitle">En attente d'autres joueurs...</div>
+                    </div>
+                `
+                : `
+                    <div class="waiting-list-item waiting-list-item--host">
+                        <div class="waiting-item-title">Hote de la session</div>
+                        <div class="waiting-item-subtitle">Cette personne modifiera les reglages et lancera la partie.</div>
+                    </div>
+                    <div class="waiting-list-item waiting-list-item--guest">
+                        <div class="waiting-item-title">Vous (invite)</div>
+                        <div class="waiting-item-subtitle">Lecture seule en attendant le vrai mode multijoueur.</div>
+                    </div>
+                    <div class="waiting-list-item waiting-list-item--placeholder">
+                        <div class="waiting-item-title">Synchronisation reseau</div>
+                        <div class="waiting-item-subtitle">La connexion reelle entre appareils sera branchee plus tard.</div>
+                    </div>
+                `;
+
+            const helperMessage = isHost
+                ? `Seul l'hote peut ajuster les reglages avant le lancement de la partie.`
+                : `Les reglages sont visibles ici, mais seul l'hote pourra les modifier et lancer la partie.`;
+
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Salle d'attente</h2>
+                <div class="waiting-layout">
+                    <div class="waiting-stage">
+                        <div class="waiting-side waiting-side--players">
+                            <div class="waiting-panel">
+                            <div class="waiting-panel-title">Joueurs presents</div>
+                            <div class="waiting-list">
+                                ${playersBlock}
+                            </div>
+                        </div>
+                        </div>
+                        <div class="waiting-main">
+                            ${renderWaitingRoomRoleCard(isHost)}
+                            <div class="waiting-code-card">
+                                <p class="waiting-code-text">Partage ce code pour que les joueurs puissent rejoindre la partie.</p>
+                                <div class="waiting-code-block">${code}</div>
+                            </div>
+                            <div class="waiting-action-row">
+                                <button id="copySessionCodeBtn" type="button">Copier le code</button>
+                                <button id="shareSessionCodeBtn" type="button">Partager</button>
+                            </div>
+                            <div class="waiting-action-row">
+                                ${actionButtons}
+                            </div>
+                            <p class="waiting-note waiting-note--primary">${helperMessage}</p>
+                            <p class="waiting-note waiting-note--secondary">Le mode reseau n'est pas encore branche : cet ecran sert a preparer une vraie session pour plus tard.</p>
+                        </div>
+                        <div class="waiting-side waiting-side--settings">
+                            ${renderSessionSettingsCard(settings, isHost)}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('copySessionCodeBtn').addEventListener('click', async function() {
+                try {
+                    await navigator.clipboard.writeText(code);
+                    this.textContent = 'Code copie';
+                    showToast('Code de session copie.');
+                } catch (error) {
+                    showCopyFallbackDialog('Code de session', 'Copie ce code pour le partager aux autres joueurs.', code);
+                }
+            });
+
+            document.getElementById('shareSessionCodeBtn').addEventListener('click', function() {
+                showShareSessionDialog(code);
+            });
+
+            if (isHost) {
+                const rangeInput = document.getElementById('sessionPlayersRange');
+                const playersValue = document.getElementById('sessionPlayersValue');
+                const mrWhiteCheckbox = document.getElementById('sessionMrWhiteCheckbox');
+                const undercoverCheckbox = document.getElementById('sessionUndercoverCheckbox');
+
+                function updateSessionSettings(partialSettings) {
+                    sessionState.settings = normalizeSessionSettings({
+                        ...sessionState.settings,
+                        ...partialSettings
+                    });
+
+                    if (playersValue) {
+                        playersValue.textContent = sessionState.settings.players;
+                    }
+                    if (rangeInput && Number(rangeInput.value) !== sessionState.settings.players) {
+                        rangeInput.value = String(sessionState.settings.players);
+                    }
+                    if (mrWhiteCheckbox) {
+                        mrWhiteCheckbox.checked = sessionState.settings.mrWhite;
+                    }
+                    if (undercoverCheckbox) {
+                        undercoverCheckbox.checked = sessionState.settings.undercover;
+                    }
+                }
+
+                rangeInput.addEventListener('input', function() {
+                    updateSessionSettings({
+                        players: parseInt(this.value, 10)
+                    });
+                });
+                mrWhiteCheckbox.addEventListener('change', function() {
+                    updateSessionSettings({
+                        mrWhite: this.checked
+                    });
+                });
+                undercoverCheckbox.addEventListener('change', function() {
+                    updateSessionSettings({
+                        undercover: this.checked
+                    });
+                });
+
+                document.getElementById('launchSessionBtn').addEventListener('click', function() {
+                    const currentSettings = normalizeSessionSettings(sessionState.settings);
+                    showCardsScreen(currentSettings.players, currentSettings.mrWhite, currentSettings.undercover);
+                });
+            }
+
+            document.getElementById('backHomeBtn').addEventListener('click', function() {
+                window.location.reload();
+            });
+        }
+
+        function showOptionsScreen(mode = 'local') {
+            const isSessionMode = mode === 'session' && !!sessionState;
+            const settings = normalizeSessionSettings(
+                isSessionMode && sessionState
+                    ? sessionState.settings
+                    : getDefaultSessionSettings()
+            );
+            const code = isSessionMode && sessionState
+                ? sessionState.code
+                : createSessionCode();
+
+            showWaitingRoomScreen(code, {
+                isHost: isSessionMode && sessionState ? sessionState.isHost : true,
+                settings: settings
+            });
+        }
+
+        function attachOptionsFormListener() {
+            return;
+        }
+
+        document.getElementById('startBtn').addEventListener('click', function() {
+            showWaitingRoomScreen(createSessionCode(), {
+                isHost: true,
+                settings: getDefaultSessionSettings()
+            });
+        });
+    </script>
+</body>
+</html>
