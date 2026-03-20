@@ -591,6 +591,7 @@
             const sharedSessionCode = getSessionCodeFromUrl();
             const savedOnlineAuth = loadOnlineSessionAuth();
             captureCurrentPublicShareBaseUrl();
+            const pendingInfoMessage = consumePendingInfoMessage();
             if (createBtn) {
                 createBtn.addEventListener('click', function() {
                     showCreateSessionDialog();
@@ -616,6 +617,12 @@
                     showJoinSessionDialog(sharedSessionCode, savedOnlineAuth ? savedOnlineAuth.playerName : '');
                 }, 120);
             }
+
+            if (pendingInfoMessage) {
+                window.setTimeout(() => {
+                    showInfoDialog('Session terminee', pendingInfoMessage);
+                }, 180);
+            }
         });
 
         let sessionState = null;
@@ -628,6 +635,7 @@
         };
         const ONLINE_AUTH_STORAGE_KEY = 'undercover_online_auth';
         const PUBLIC_SHARE_URL_STORAGE_KEY = 'undercover_public_share_url';
+        const PENDING_INFO_STORAGE_KEY = 'undercover_pending_info';
 
         function getDefaultSessionSettings() {
             return {
@@ -873,6 +881,13 @@
             });
         }
 
+        function handleRemovedFromOnlineSession(message = 'Tu as quitte cette session ou tu as ete exclu par l hote.') {
+            stopOnlineSessionPolling();
+            clearOnlineSessionAuth();
+            savePendingInfoMessage(message);
+            window.location.href = window.location.pathname;
+        }
+
         function showConfirmDialog(title, message, confirmLabel, onConfirm) {
             const overlay = createDialog(`
                 <div class="dialog-kicker">Confirmation</div>
@@ -1071,6 +1086,26 @@
             window.localStorage.removeItem(ONLINE_AUTH_STORAGE_KEY);
         }
 
+        function savePendingInfoMessage(message) {
+            try {
+                window.sessionStorage.setItem(PENDING_INFO_STORAGE_KEY, String(message || '').trim());
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        function consumePendingInfoMessage() {
+            try {
+                const message = window.sessionStorage.getItem(PENDING_INFO_STORAGE_KEY) || '';
+                if (message) {
+                    window.sessionStorage.removeItem(PENDING_INFO_STORAGE_KEY);
+                }
+                return message;
+            } catch (error) {
+                return '';
+            }
+        }
+
         function stopOnlineSessionPolling() {
             if (onlineSessionRuntime.pollTimer) {
                 window.clearTimeout(onlineSessionRuntime.pollTimer);
@@ -1113,13 +1148,19 @@
             }
 
             if (!response.ok) {
-                throw new Error(data.error || `Erreur ${response.status}`);
+                const errorMessage = data.error || `Erreur ${response.status}`;
+                if (errorMessage.includes('ne reconnait pas ce joueur')) {
+                    handleRemovedFromOnlineSession();
+                    throw new Error(errorMessage);
+                }
+
+                throw new Error(errorMessage);
             }
 
             return data;
         }
 
-        function scheduleOnlineSessionRefresh(delay = 1200) {
+        function scheduleOnlineSessionRefresh(delay = 800) {
             stopOnlineSessionPolling();
             if (!onlineSessionRuntime.auth) return;
 
@@ -1153,12 +1194,13 @@
 
                 scheduleOnlineSessionRefresh();
             } catch (error) {
+                if (error.message.includes('ne reconnait pas ce joueur')) {
+                    return;
+                }
+
                 stopOnlineSessionPolling();
                 clearOnlineSessionAuth();
-                const isPlayerRemoved = error.message.includes('ne reconnait pas ce joueur');
-                const helpMessage = isPlayerRemoved
-                    ? 'Tu as quitte cette session ou tu as ete exclu par l hote.'
-                    : `${escapeHtml(error.message)}<br><br>${getServerHelpMessage()}`;
+                const helpMessage = `${escapeHtml(error.message)}<br><br>${getServerHelpMessage()}`;
                 showInfoDialog('Session indisponible', helpMessage);
             }
         }
