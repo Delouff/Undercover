@@ -354,13 +354,7 @@ function buildVoteSummary(session, targetId, ballots) {
     const guessedRoleLabel = guessedRole ? roleLabel(guessedRole) : null;
     const actualRoleLabel = roleLabel(actualRole);
     const voteWasCorrect = Boolean(guessedRole && guessedRole === actualRole);
-    let message = '';
-
-    if (guessedRole) {
-        message = `${target.name} a ete elimine. Le salon le pensait ${guessedRoleLabel}. Son role reel etait ${actualRoleLabel}.`;
-    } else {
-        message = `${target.name} a ete elimine, mais le salon ne s est pas accorde sur son role. Son role reel etait ${actualRoleLabel}.`;
-    }
+    const message = `${target.name} a ete demasque. Il etait ${actualRoleLabel}.`;
 
     return {
         roundNumber: session.roundNumber,

@@ -177,6 +177,24 @@
             line-height: 1.5;
             color: #111;
         }
+        .dialog-word-secret {
+            display: inline-block;
+            transition: filter 0.22s ease, opacity 0.22s ease, transform 0.22s ease;
+            transform-origin: center;
+        }
+        .dialog-word-secret--blurred {
+            filter: blur(10px);
+            opacity: 0.72;
+            transform: scale(0.985);
+            user-select: none;
+            pointer-events: none;
+        }
+        .dialog-word-note {
+            display: block;
+            margin-top: 10px;
+            font-size: 0.94rem;
+            color: #5f5f5f;
+        }
         .dialog-card--wide {
             width: min(100%, 500px);
         }
@@ -2165,6 +2183,30 @@
             });
         }
 
+        function openOnlineSecretReminder(secret, playerName = '') {
+            if (!secret) return;
+
+            const title = playerName
+                ? `Rappel personnel de ${playerName}`
+                : 'Rappel personnel';
+            const message = secret.role === 'mrwhite'
+                ? `<b>Force a toi MrWhite !</b><br><i>Tu n'as pas de mot.</i>`
+                : `Ton mot : <b>${escapeHtml(secret.word)}</b>`;
+            const overlay = createDialog(`
+                <div class="dialog-kicker">Memo</div>
+                <h3>${escapeHtml(title)}</h3>
+                <div class="dialog-word" style="margin:18px 0;">${message}</div>
+                <p>Referme cette carte des que tu as retrouve ton mot.</p>
+                <div class="dialog-actions">
+                    <button id="closeSecretReminderBtn" type="button">Fermer</button>
+                </div>
+            `);
+
+            document.getElementById('closeSecretReminderBtn').addEventListener('click', function() {
+                closeDialog(overlay);
+            });
+        }
+
         function handleRemovedFromOnlineSession(message = 'Tu as quitte cette session ou tu as ete exclu par l hote.') {
             stopOnlineSessionPolling();
             clearOnlineSessionAuth();
@@ -4008,9 +4050,10 @@
 
         function renderOnlineSecretScreen(view) {
             const secret = view.secret;
-            const message = secret.role === 'mrwhite'
-                ? `<b>Force a toi MrWhite !</b><br><i>Tu n'as pas de mot.</i>`
-                : `Ton mot : <b>${escapeHtml(secret.word)}</b>`;
+            const isWordRole = secret.role !== 'mrwhite';
+            const message = isWordRole
+                ? `Ton mot : <b id="onlineSecretWord" class="dialog-word-secret ${secret.acknowledged ? 'dialog-word-secret--blurred' : ''}">${escapeHtml(secret.word)}</b>${secret.acknowledged ? '<span class="dialog-word-note">Mot floute apres memorisation.</span>' : ''}`
+                : `<b>Force a toi MrWhite !</b><br><i>Tu n'as pas de mot.</i>`;
             const waitingMessage = view.allSecretsAcknowledged
                 ? 'Tous les joueurs ont memorise leur mot. La partie passe au tour des mots.'
                 : `${view.acknowledgedCount}/${view.playerCount} joueur(s) ont memorise leur mot.`;
@@ -4053,10 +4096,36 @@
             const ackBtn = document.getElementById('ackSecretBtn');
             if (ackBtn) {
                 ackBtn.addEventListener('click', async function() {
+                    const secretWord = document.getElementById('onlineSecretWord');
+                    if (secretWord) {
+                        secretWord.classList.add('dialog-word-secret--blurred');
+                        if (!document.querySelector('.dialog-word-note')) {
+                            const note = document.createElement('span');
+                            note.className = 'dialog-word-note';
+                            note.textContent = 'Mot floute apres memorisation.';
+                            secretWord.parentNode?.appendChild(note);
+                        }
+                    }
+                    ackBtn.disabled = true;
+                    ackBtn.textContent = 'Mot memorise';
+                    ackBtn.style.opacity = '0.7';
+                    ackBtn.style.cursor = 'not-allowed';
+
                     try {
                         await performOnlineAction('/api/session/ack-secret');
                         await refreshOnlineSession(true);
                     } catch (error) {
+                        if (secretWord) {
+                            secretWord.classList.remove('dialog-word-secret--blurred');
+                        }
+                        const note = document.querySelector('.dialog-word-note');
+                        if (note) {
+                            note.remove();
+                        }
+                        ackBtn.disabled = false;
+                        ackBtn.textContent = "J'ai memorise";
+                        ackBtn.style.opacity = '';
+                        ackBtn.style.cursor = '';
                         showInfoDialog('Impossible de valider', escapeHtml(error.message));
                     }
                 });
@@ -4208,6 +4277,7 @@
                             <p style="margin:0;line-height:1.55;opacity:0.78;">Chaque carte affiche d'abord le nom de son joueur. Quand un mot est valide, la carte se retourne et le nom du joueur apparait au-dessus.</p>
                         </div>
                         <div class="waiting-action-row" style="justify-content:flex-start;">
+                            <button id="openOnlineSecretReminderClueBtn" type="button" class="button-secondary">Revoir mon mot</button>
                             ${view.isHost ? '<button id="returnOnlineClueLobbyBtn" type="button" class="button-secondary">Retour au salon</button>' : ''}
                             <button id="leaveOnlineClueBtn" type="button" class="button-secondary">Quitter</button>
                         </div>
@@ -4216,6 +4286,9 @@
             `;
 
             document.getElementById('leaveOnlineClueBtn').addEventListener('click', leaveOnlineSession);
+            document.getElementById('openOnlineSecretReminderClueBtn').addEventListener('click', function() {
+                openOnlineSecretReminder(view.secret, view.self?.name || '');
+            });
             bindReturnToLobbyButton('returnOnlineClueLobbyBtn', {
                 message: 'Revenir au salon et interrompre la partie en cours ?'
             });
@@ -4406,6 +4479,7 @@
                         </div>
                         ${controlPanel}
                         <div class="waiting-action-row online-discussion-actions" style="justify-content:flex-start;">
+                            <button id="openOnlineSecretReminderDiscussionBtn" type="button" class="button-secondary">Revoir mon mot</button>
                             ${view.isHost ? '<button id="returnOnlineDiscussionLobbyBtn" type="button" class="button-secondary">Retour au salon</button>' : ''}
                             <button id="leaveOnlineDiscussionBtn" type="button" class="button-secondary">Quitter</button>
                         </div>
@@ -4429,6 +4503,9 @@
             `;
 
             document.getElementById('leaveOnlineDiscussionBtn').addEventListener('click', leaveOnlineSession);
+            document.getElementById('openOnlineSecretReminderDiscussionBtn').addEventListener('click', function() {
+                openOnlineSecretReminder(view.secret, view.self?.name || '');
+            });
             bindReturnToLobbyButton('returnOnlineDiscussionLobbyBtn', {
                 message: 'Revenir au salon et interrompre la partie en cours ?'
             });
