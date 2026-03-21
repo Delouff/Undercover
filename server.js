@@ -747,9 +747,16 @@ function resolveMrWhiteGuess(session, guessedWord, skipped = false) {
 
     if (guessContext.fallbackWinner) {
         nextWinner = guessContext.fallbackWinner;
-        const failureMessage = guessContext.reason === 'winner'
-            ? `${guessContext.playerName} gagne, mais ne connait pas le mot des civils.`
-            : `${guessContext.playerName} n a pas retrouve le mot des civils.`;
+        let failureMessage = `${guessContext.playerName} n a pas retrouve le mot des civils.`;
+        if (guessContext.reason === 'winner') {
+            failureMessage = nextWinner.team === 'special'
+                ? `${guessContext.playerName} et l Undercover gagnent, mais MrWhite ne connait pas le mot des civils.`
+                : `${guessContext.playerName} gagne, mais ne connait pas le mot des civils.`;
+        } else if (nextWinner.team === 'civil') {
+            failureMessage = `${guessContext.playerName} n a pas retrouve le mot des civils. Les civils remportent la partie.`;
+        } else if (nextWinner.team === 'undercover') {
+            failureMessage = `${guessContext.playerName} n a pas retrouve le mot des civils. L Undercover remporte la partie.`;
+        }
         session.mrWhiteGuessResult = buildMrWhiteGuessResultPayload(
             resultId,
             'Mot inconnu',
@@ -1239,8 +1246,8 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             return;
         }
 
-        if (session.clues.some((clue) => normalizeClueText(clue.text) === normalizedText)) {
-            sendError(res, 400, 'Ce mot a deja ete propose pendant ce tour.');
+        if ((session.clueHistory || []).some((clue) => normalizeClueText(clue.text) === normalizedText)) {
+            sendError(res, 400, 'Ce mot a deja ete propose pendant cette partie.');
             return;
         }
 
