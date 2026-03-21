@@ -77,6 +77,14 @@ function normalizeChatMessage(value) {
     return String(value || '').replace(/\s+/g, ' ').trim().substring(0, 100);
 }
 
+function normalizeClueText(value) {
+    let normalized = String(value || '').replace(/\s+/g, ' ').trim().substring(0, 24).toLowerCase();
+    if (typeof normalized.normalize === 'function') {
+        normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+    return normalized;
+}
+
 function normalizeVoteRole(value) {
     const role = String(value || '').trim().toLowerCase();
     return role === 'mrwhite' || role === 'undercover' ? role : '';
@@ -958,8 +966,15 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             return;
         }
 
+        const normalizedText = normalizeClueText(text);
+
         if (session.clues.some((clue) => clue.playerId === player.id)) {
             sendError(res, 400, 'Tu as deja propose un mot pour ce tour.');
+            return;
+        }
+
+        if (session.clues.some((clue) => normalizeClueText(clue.text) === normalizedText)) {
+            sendError(res, 400, 'Ce mot a deja ete propose pendant ce tour.');
             return;
         }
 

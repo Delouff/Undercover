@@ -1612,10 +1612,25 @@
             }
         }
         @media (max-width: 980px) {
+            body {
+                justify-content: flex-start;
+                padding: 10px 0 12px;
+            }
+            h1, h2 {
+                margin-bottom: 12px;
+                font-size: clamp(1.8rem, 6vw, 2.7rem);
+            }
             .home-shell {
                 width: calc(100% - 32px);
+                min-height: calc(100svh - 86px);
+                max-height: calc(100svh - 86px);
                 grid-template-columns: 1fr;
                 justify-items: center;
+                align-content: start;
+                gap: 18px;
+                overflow: auto;
+                padding-right: 4px;
+                -webkit-overflow-scrolling: touch;
             }
             .home-copy,
             .home-side-card {
@@ -1641,7 +1656,17 @@
             }
             .waiting-layout {
                 width: calc(100% - 32px);
+                height: calc(100svh - 86px);
                 padding: 0 16px;
+                align-items: stretch;
+            }
+            .waiting-stage {
+                height: 100%;
+                align-items: start;
+                align-content: start;
+                overflow: auto;
+                padding-right: 4px;
+                -webkit-overflow-scrolling: touch;
             }
             .waiting-main,
             .waiting-side,
@@ -1653,8 +1678,12 @@
                 width: calc(100% - 32px);
                 padding: 0 16px;
                 grid-template-columns: 1fr;
-                height: auto;
-                min-height: calc(100svh - 124px);
+                height: calc(100svh - 86px);
+                min-height: calc(100svh - 86px);
+                align-items: start;
+                overflow: auto;
+                padding-right: 12px;
+                -webkit-overflow-scrolling: touch;
             }
             .online-discussion-column {
                 height: auto;
@@ -1663,23 +1692,58 @@
                 max-width: none;
             }
             .online-discussion-column--board .online-chat-panel {
-                min-height: 360px;
+                min-height: 320px;
             }
             .online-chat-panel {
                 min-height: 0;
             }
             .online-chat-feed {
-                min-height: 260px;
-                max-height: 320px;
+                min-height: 200px;
+                max-height: 280px;
+            }
+            .online-clue-stage {
+                height: calc(100svh - 86px);
+                align-items: start;
+                overflow: auto;
+                padding-bottom: 12px;
+                padding-right: 12px;
+                -webkit-overflow-scrolling: touch;
             }
             .online-clue-grid {
                 grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            }
+            .single-screen-stack,
+            .local-distribution-shell,
+            .local-game-layout {
+                width: calc(100% - 32px);
+                height: calc(100svh - 86px);
+                justify-content: flex-start;
+                overflow: auto;
+                padding: 4px 16px 12px;
+                -webkit-overflow-scrolling: touch;
             }
             .local-game-layout {
                 grid-template-columns: 1fr;
             }
         }
         @media (max-width: 640px) {
+            body {
+                padding: 8px 0 10px;
+            }
+            h1, h2 {
+                margin-bottom: 10px;
+                font-size: clamp(1.55rem, 7vw, 2.2rem);
+            }
+            .dialog-overlay {
+                padding: 14px;
+                align-items: center;
+            }
+            .dialog-card {
+                width: min(100%, 94vw);
+                max-height: calc(100svh - 28px);
+                overflow: auto;
+                padding: 24px 18px;
+            }
             .home-title-row {
                 flex-direction: column;
             }
@@ -1689,6 +1753,7 @@
             .home-copy,
             .home-side-card {
                 width: 100%;
+                padding: 20px 16px;
             }
             .home-button {
                 width: 100%;
@@ -1697,6 +1762,25 @@
             .home-emblem {
                 width: 72px;
                 height: 72px;
+            }
+            .home-title {
+                font-size: clamp(2rem, 11vw, 3rem);
+            }
+            .home-subtitle,
+            .home-side-item span,
+            .home-side-grid-note,
+            .waiting-role-text,
+            .waiting-note {
+                font-size: 0.94rem;
+                line-height: 1.5;
+            }
+            .waiting-panel,
+            .waiting-code-card,
+            .waiting-role-card,
+            .local-game-panel,
+            .local-identify-panel {
+                padding: 14px;
+                border-radius: 14px;
             }
             .waiting-settings-grid {
                 grid-template-columns: 1fr;
@@ -1711,10 +1795,12 @@
             }
             .waiting-action-row {
                 width: 100%;
+                flex-direction: column;
+                align-items: stretch;
             }
             .waiting-code-block {
-                font-size: 2rem;
-                letter-spacing: 0.22rem;
+                font-size: 1.55rem;
+                letter-spacing: 0.14rem;
             }
             .online-chat-input-row {
                 flex-direction: column;
@@ -1723,16 +1809,85 @@
             .online-char-count {
                 align-self: flex-start;
             }
+            .online-discussion-layout,
+            .online-clue-stage,
+            .single-screen-stack,
+            .local-distribution-shell,
+            .local-game-layout,
+            .waiting-layout {
+                width: calc(100% - 20px);
+            }
             .online-clue-card {
-                min-height: 150px;
+                height: 144px;
+                min-height: 144px;
             }
             .online-clue-card-inner {
-                min-height: 150px;
+                height: 144px;
+                min-height: 144px;
             }
             .online-clue-card-face {
-                padding: 16px;
+                padding: 12px;
+                border-radius: 16px;
             }
-            .online-clue-grid {
+            .online-clue-card-name {
+                font-size: 1rem;
+            }
+            .online-clue-card-status,
+            .online-clue-card-footnote {
+                font-size: 0.78rem;
+            }
+            .online-clue-card-word {
+                font-size: clamp(0.95rem, 4.4vw, 1.2rem);
+            }
+            .online-clue-grid,
+            .online-discussion-clue-grid,
+            #cardsContainer {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+            .online-discussion-column--board .online-chat-panel {
+                min-height: 280px;
+            }
+            .online-chat-feed {
+                min-height: 150px;
+                max-height: 220px;
+            }
+            .card {
+                width: 100% !important;
+                height: 150px !important;
+            }
+            #cardsContainer {
+                max-height: none;
+                padding: 0;
+            }
+            .local-status-row,
+            .local-identify-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+        @media (max-width: 420px) {
+            .home-shell,
+            .waiting-layout,
+            .online-discussion-layout,
+            .online-clue-stage,
+            .single-screen-stack,
+            .local-distribution-shell,
+            .local-game-layout {
+                width: calc(100% - 16px);
+            }
+            .home-copy,
+            .home-side-card,
+            .waiting-panel,
+            .waiting-code-card,
+            .waiting-role-card,
+            .local-game-panel,
+            .local-identify-panel {
+                padding: 12px;
+            }
+            .online-clue-grid,
+            .online-discussion-clue-grid,
+            #cardsContainer {
                 grid-template-columns: 1fr;
             }
         }
@@ -2136,6 +2291,14 @@
                 .replaceAll('>', '&gt;')
                 .replaceAll('"', '&quot;')
                 .replaceAll("'", '&#39;');
+        }
+
+        function normalizeClueTextForComparison(value) {
+            let normalized = String(value || '').replace(/\s+/g, ' ').trim().substring(0, 24).toLowerCase();
+            if (typeof normalized.normalize === 'function') {
+                normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            }
+            return normalized;
         }
 
         function createDialog(content, wide = false) {
@@ -2543,6 +2706,7 @@
                 }
 
                 scheduleOnlineSessionRefresh();
+                return view;
             } catch (error) {
                 if (error.message.includes('ne reconnait pas ce joueur')) {
                     return;
@@ -2614,6 +2778,27 @@
                         showInfoDialog('Impossible de revenir au salon', escapeHtml(error.message));
                     }
                 });
+            });
+        }
+
+        function bindWaitForHostLobbyButton(buttonId) {
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+
+            button.addEventListener('click', async function() {
+                try {
+                    const view = await refreshOnlineSession(true);
+                    if (view && view.status === 'waiting') {
+                        return;
+                    }
+
+                    showInfoDialog(
+                        'En attente de l hote',
+                        "L hote n'a pas encore clique sur Retour au salon."
+                    );
+                } catch (error) {
+                    showInfoDialog('Impossible de revenir au salon', escapeHtml(error.message));
+                }
             });
         }
 
@@ -3241,6 +3426,20 @@
 
                     if (!value) {
                         errorBox.textContent = 'Entre un mot avant de valider.';
+                        errorBox.style.display = 'block';
+                        input.focus();
+                        return;
+                    }
+
+                    const normalizedValue = normalizeClueTextForComparison(value);
+                    const duplicateWord = joueurs.some((otherPlayer, otherIndex) => (
+                        otherIndex !== idx
+                        && otherPlayer
+                        && normalizeClueTextForComparison(otherPlayer.motPropose || '') === normalizedValue
+                    ));
+
+                    if (duplicateWord) {
+                        errorBox.textContent = 'Ce mot a deja ete propose pendant ce tour.';
                         errorBox.style.display = 'block';
                         input.focus();
                         return;
@@ -4316,6 +4515,15 @@
                         return;
                     }
 
+                    const normalizedText = normalizeClueTextForComparison(text);
+                    const duplicateWord = view.clues.some((clue) => normalizeClueTextForComparison(clue.text) === normalizedText);
+                    if (duplicateWord) {
+                        errorBox.textContent = 'Ce mot a deja ete propose pendant ce tour.';
+                        errorBox.style.display = 'block';
+                        input.focus();
+                        return;
+                    }
+
                     try {
                         await performOnlineAction('/api/session/submit-clue', { text });
                         await refreshOnlineSession(true);
@@ -4813,15 +5021,19 @@
                         </div>
                     </div>
                     <div class="waiting-action-row">
-                        ${view.isHost ? '<button id="returnOnlineFinishedLobbyBtn" type="button">Retour au salon</button>' : ''}
+                        <button id="returnOnlineFinishedLobbyBtn" type="button">Retour au salon</button>
                         <button id="leaveOnlineFinishedBtn" type="button" class="button-secondary">Quitter la session</button>
                     </div>
                 </div>
             `;
 
-            bindReturnToLobbyButton('returnOnlineFinishedLobbyBtn', {
-                message: 'Revenir au salon avec les memes joueurs et les memes reglages ?'
-            });
+            if (view.isHost) {
+                bindReturnToLobbyButton('returnOnlineFinishedLobbyBtn', {
+                    message: 'Revenir au salon avec les memes joueurs et les memes reglages ?'
+                });
+            } else {
+                bindWaitForHostLobbyButton('returnOnlineFinishedLobbyBtn');
+            }
             document.getElementById('leaveOnlineFinishedBtn').addEventListener('click', leaveOnlineSession);
         }
 
