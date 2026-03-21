@@ -1126,6 +1126,7 @@
         }
         .online-discussion-clue-card {
             min-height: 164px;
+            isolation: isolate;
         }
         .online-discussion-clue-card .online-clue-card-face--front {
             position: relative;
@@ -1154,13 +1155,13 @@
         .online-discussion-clue-hover {
             position: absolute;
             inset: 0;
-            z-index: 2;
+            z-index: 6;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 16px;
             border-radius: 20px;
-            background: linear-gradient(180deg, rgba(8, 8, 8, 0.12), rgba(8, 8, 8, 0.58));
+            background: linear-gradient(180deg, rgba(8, 8, 8, 0.18), rgba(8, 8, 8, 0.68));
             opacity: 0;
             transform: translateY(8px);
             transition: opacity 0.18s ease, transform 0.18s ease;
@@ -4187,8 +4188,9 @@
             const cluesHtml = view.clues.length
                 ? view.clues.map((entry) => {
                     const player = playerInfoById.get(entry.playerId);
+                    const isSelfCard = entry.playerId === view.self.id;
                     const label = `${entry.playerName}${entry.playerId === view.self.id ? ' (vous)' : ''}`;
-                    const isClickable = Boolean(view.canVote && view.guessRoleOptions.length && player?.alive);
+                    const isClickable = Boolean(view.canVote && view.guessRoleOptions.length && player?.alive && !isSelfCard);
                     const isVotedTarget = view.yourVote?.type === 'accuse' && view.yourVote.targetPlayerId === entry.playerId;
                     const cardClasses = ['online-clue-card', 'online-discussion-clue-card', 'online-clue-card--revealed'];
                     let footnote = 'Carte revelee';
@@ -4202,6 +4204,8 @@
                             footnote = 'Tu as passe ce debat';
                         } else if (isVotedTarget && view.yourVote?.guessedRoleLabel) {
                             footnote = `Ton vote : ${view.yourVote.guessedRoleLabel}`;
+                        } else if (isSelfCard && view.self.alive) {
+                            footnote = 'Tu ne peux pas voter contre toi';
                         } else if (player?.hasVoted) {
                             footnote = 'Vote envoye';
                         } else if (!view.self.alive) {
@@ -4229,9 +4233,9 @@
                                         <div class="online-clue-card-kicker">Mot du tour</div>
                                         <p class="online-clue-card-word">${escapeHtml(entry.text)}</p>
                                         <p class="online-clue-card-footnote">${escapeHtml(footnote)}</p>
-                                        ${isClickable ? `<div class="online-discussion-clue-hover"><span>Voter pour ${escapeHtml(entry.playerName)}</span></div>` : ''}
                                     </div>
                                 </div>
+                                ${isClickable ? `<div class="online-discussion-clue-hover"><span>Voter pour ${escapeHtml(entry.playerName)}</span></div>` : ''}
                             </div>
                         </div>
                     `;

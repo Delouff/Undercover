@@ -1049,6 +1049,11 @@ async function handleApiRequest(req, res, pathname, searchParams) {
                 return;
             }
 
+            if (target.id === player.id) {
+                sendError(res, 400, 'Tu ne peux pas voter contre toi meme.');
+                return;
+            }
+
             if (!guessedRole || !allowedRoles.includes(guessedRole)) {
                 sendError(res, 400, 'Choisis un role valide avant de voter.');
                 return;
