@@ -10,10 +10,11 @@
         :root {
             --desktop-shell-width: min(1380px, calc(100vw - 88px));
             --desktop-shell-width-tight: min(1280px, calc(100vw - 88px));
+            --desktop-three-panel-width: min(1240px, calc(100vw - 132px));
             --desktop-shell-height: calc(100svh - 172px);
             --desktop-home-height: calc(100svh - 60px);
             --desktop-shell-gap: clamp(20px, 2.4vw, 30px);
-            --desktop-three-panel-columns: minmax(240px, 1fr) minmax(480px, 2fr) minmax(240px, 1fr);
+            --desktop-three-panel-columns: minmax(190px, 1fr) minmax(400px, 2fr) minmax(190px, 1fr);
         }
         body {
             display: flex;
@@ -399,13 +400,13 @@
         .home-shell {
             position: relative;
             z-index: 2;
-            width: min(1320px, calc(100vw - 88px));
+            width: var(--desktop-three-panel-width);
             min-height: var(--desktop-home-height);
             max-height: var(--desktop-home-height);
             margin: 0 auto;
             display: grid;
             grid-template-columns: var(--desktop-three-panel-columns);
-            gap: clamp(42px, 4.8vw, 74px);
+            gap: clamp(28px, 4vw, 54px);
             justify-items: stretch;
             align-items: center;
             align-content: center;
@@ -422,10 +423,10 @@
         .home-copy {
             width: 100%;
             max-height: 100%;
-            padding: 42px 44px 38px;
+            padding: 34px 34px 30px;
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 16px;
             align-items: center;
             text-align: center;
             grid-column: 2;
@@ -484,7 +485,7 @@
         }
         .home-title {
             margin: 0;
-            font-size: clamp(3rem, 6vw, 4.9rem);
+            font-size: clamp(2.55rem, 5.2vw, 4.2rem);
             line-height: 0.95;
             letter-spacing: -0.08rem;
             text-align: center;
@@ -499,9 +500,9 @@
         }
         .home-subtitle {
             margin: 0;
-            max-width: 640px;
-            font-size: 1.16rem;
-            line-height: 1.7;
+            max-width: 560px;
+            font-size: 1.03rem;
+            line-height: 1.62;
             color: rgba(255, 255, 255, 0.82);
         }
         .home-tags {
@@ -526,7 +527,7 @@
             justify-content: center;
         }
         .home-button {
-            min-width: 220px;
+            min-width: 196px;
             border-radius: 16px;
         }
         .home-button--ghost {
@@ -542,10 +543,10 @@
         .home-side-card {
             width: 100%;
             max-height: 100%;
-            padding: 22px 20px;
+            padding: 18px 16px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
             justify-content: center;
             align-self: center;
         }
@@ -563,14 +564,14 @@
         }
         .home-side-title {
             margin: 0;
-            font-size: 1.14rem;
+            font-size: 1.02rem;
             line-height: 1.25;
         }
         .home-side-subtitle {
             margin: 0;
-            line-height: 1.5;
+            line-height: 1.45;
             color: rgba(255, 255, 255, 0.7);
-            font-size: 0.94rem;
+            font-size: 0.88rem;
         }
         .home-side-badge {
             width: fit-content;
@@ -956,12 +957,12 @@
             opacity: 0.68;
         }
         .online-discussion-layout {
-            width: var(--desktop-shell-width);
+            width: var(--desktop-three-panel-width);
             height: var(--desktop-shell-height);
             padding: 0 20px;
             display: grid;
             grid-template-columns: var(--desktop-three-panel-columns);
-            gap: var(--desktop-shell-gap);
+            gap: clamp(18px, 2.4vw, 26px);
             align-items: center;
             margin: 0 auto;
             z-index: 2;
@@ -969,16 +970,34 @@
         .online-discussion-column {
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
             min-width: 0;
             min-height: 0;
+        }
+        .online-discussion-layout .waiting-panel,
+        .online-discussion-layout .waiting-role-card {
+            padding: 16px;
+            border-radius: 15px;
+        }
+        .online-discussion-layout .waiting-panel-title,
+        .online-discussion-layout .waiting-role-title {
+            font-size: 0.98rem;
+        }
+        .online-discussion-layout .waiting-role-text,
+        .online-discussion-layout .waiting-note,
+        .online-discussion-layout .waiting-list-item,
+        .online-discussion-layout .online-char-count {
+            font-size: 0.92rem;
+        }
+        .online-discussion-layout .waiting-list-item {
+            padding: 9px 12px;
         }
         .online-vote-panel {
             align-self: stretch;
             min-height: 0;
         }
         .online-vote-panel .waiting-list {
-            max-height: 240px;
+            max-height: 220px;
         }
         .online-chat-panel {
             min-height: 0;
