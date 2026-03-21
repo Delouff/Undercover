@@ -77,6 +77,14 @@ function normalizeChatMessage(value) {
     return String(value || '').replace(/\s+/g, ' ').trim().substring(0, 100);
 }
 
+function normalizeSecretWord(value) {
+    let normalized = String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (typeof normalized.normalize === 'function') {
+        normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+    return normalized;
+}
+
 function normalizeClueText(value) {
     let normalized = String(value || '').replace(/\s+/g, ' ').trim().substring(0, 24).toLowerCase();
     if (typeof normalized.normalize === 'function') {
@@ -183,6 +191,7 @@ function removePlayerFromSession(session, playerId) {
     }
 
     session.clues = (session.clues || []).filter((clue) => clue.playerId !== playerId);
+    session.clueHistory = (session.clueHistory || []).filter((clue) => clue.playerId !== playerId);
     delete session.votes[playerId];
     Object.keys(session.votes || {}).forEach((voterId) => {
         if (session.votes[voterId]?.targetPlayerId === playerId) {
@@ -203,7 +212,26 @@ function removePlayerFromSession(session, playerId) {
         session.hostPlayerId = session.players[0].id;
     }
 
-    if (session.status === 'secrets') {
+    if (session.status === 'mrwhite_guess' && session.mrWhiteGuess?.playerId === playerId) {
+        const failureSummary = {
+            roundNumber: session.roundNumber,
+            type: 'mrwhite_failed',
+            title: 'MrWhite indisponible',
+            message: `${removedPlayer.name} a quitte la partie avant de dechiffrer le mot des civils.`
+        };
+        session.mrWhiteGuessResult = buildMrWhiteGuessResultPayload(
+            randomMessageId(),
+            'Mot inconnu',
+            `${removedPlayer.name} a quitte la partie avant de dechiffrer le mot des civils.`,
+            false
+        );
+
+        if (session.mrWhiteGuess.fallbackWinner) {
+            finishSession(session, session.mrWhiteGuess.sourceSummary || failureSummary, session.mrWhiteGuess.fallbackWinner);
+        } else {
+            beginNextRound(session, failureSummary);
+        }
+    } else if (session.status === 'secrets') {
         if (session.secretAcknowledged.size === session.players.length && session.players.length > 0) {
             session.status = 'clues';
             session.activeClueIndex = 0;
@@ -291,6 +319,12 @@ function getConfiguredGuessRoles(session) {
     )));
 }
 
+function getPlayerPastClues(session, playerId) {
+    return (session.clueHistory || [])
+        .filter((entry) => entry.playerId === playerId && entry.roundNumber < session.roundNumber)
+        .map((entry) => entry.text);
+}
+
 function getActiveCluePlayer(session) {
     if (session.status !== 'clues') {
         return null;
@@ -302,6 +336,100 @@ function getActiveCluePlayer(session) {
 
 function getCluePlayerName(session, playerId) {
     return session.players.find((entry) => entry.id === playerId)?.name || 'Joueur';
+}
+
+function getCivilWord(session) {
+    const civilAssignment = Object.values(session.assignments || {}).find((entry) => entry?.role === 'civil' && entry.word);
+    return civilAssignment?.word || '';
+}
+
+function getMrWhitePlayer(session, aliveOnly = false) {
+    return session.players.find((player) => {
+        const role = session.assignments?.[player.id]?.role;
+        if (role !== 'mrwhite') return false;
+        return !aliveOnly || isPlayerAlive(session, player.id);
+    }) || null;
+}
+
+function buildMrWhiteGuessResultPayload(id, title, message, success) {
+    return {
+        id,
+        title,
+        message,
+        success: Boolean(success)
+    };
+}
+
+function createMrWhiteGuessSuccessWinner(baseWinner, reason) {
+    if (reason === 'winner') {
+        if (baseWinner?.team === 'special') {
+            return {
+                team: 'special',
+                title: 'Victoire de MrWhite et de l Undercover !',
+                message: 'MrWhite a dechiffre le mot des civils et les roles speciaux gagnent ensemble.'
+            };
+        }
+        return {
+            team: 'mrwhite',
+            title: 'Victoire de MrWhite !',
+            message: 'MrWhite a dechiffre le mot des civils et remporte la partie.'
+        };
+    }
+
+    return {
+        team: 'mrwhite',
+        title: 'Victoire de MrWhite !',
+        message: 'MrWhite a ete demasque, mais il a dechiffre le mot des civils.'
+    };
+}
+
+function createMrWhiteGuessWinnerFallback(baseWinner, reason) {
+    if (reason !== 'winner' || !baseWinner) {
+        return baseWinner || null;
+    }
+
+    if (baseWinner.team === 'special') {
+        return {
+            team: 'special',
+            title: 'Victoire de MrWhite et de l Undercover !',
+            message: 'MrWhite gagne avec l Undercover, mais ne connait pas le mot des civils.'
+        };
+    }
+
+    if (baseWinner.team === 'mrwhite') {
+        return {
+            team: 'mrwhite',
+            title: 'Victoire de MrWhite !',
+            message: 'MrWhite gagne, mais ne connait pas le mot des civils.'
+        };
+    }
+
+    return baseWinner;
+}
+
+function startMrWhiteGuessPhase(session, options = {}) {
+    const playerId = String(options.playerId || '').trim();
+    const player = ensurePlayer(session, playerId);
+    if (!player) {
+        return false;
+    }
+
+    const guessId = randomMessageId();
+    const reason = options.reason === 'winner' ? 'winner' : 'eliminated';
+    session.status = 'mrwhite_guess';
+    session.activeClueIndex = 0;
+    session.discussionMessages = [];
+    session.votes = {};
+    session.mrWhiteGuess = {
+        id: guessId,
+        playerId: player.id,
+        playerName: player.name,
+        reason,
+        sourceSummary: options.sourceSummary || session.lastRoundSummary || null,
+        fallbackWinner: createMrWhiteGuessWinnerFallback(options.baseWinner || null, reason),
+        successWinner: createMrWhiteGuessSuccessWinner(options.baseWinner || null, reason)
+    };
+    return true;
 }
 
 function determineWinner(session) {
@@ -386,6 +514,7 @@ function beginNextRound(session, summary) {
     session.clues = [];
     session.discussionMessages = [];
     session.votes = {};
+    session.mrWhiteGuess = null;
     session.lastRoundSummary = summary;
 }
 
@@ -395,6 +524,7 @@ function finishSession(session, summary, winner) {
     session.clues = [];
     session.discussionMessages = [];
     session.votes = {};
+    session.mrWhiteGuess = null;
     session.lastRoundSummary = summary;
     session.winner = winner;
 }
@@ -406,10 +536,13 @@ function returnSessionToWaiting(session) {
     session.turnOrderPlayerIds = null;
     session.secretAcknowledged = new Set();
     session.clues = [];
+    session.clueHistory = [];
     session.activeClueIndex = 0;
     session.roundNumber = 1;
     session.discussionMessages = [];
     session.votes = {};
+    session.mrWhiteGuess = null;
+    session.mrWhiteGuessResult = null;
     session.lastRoundSummary = null;
     session.winner = null;
 }
@@ -451,11 +584,37 @@ function resolveDiscussion(session) {
     const targetId = bestTarget[0];
     const targetBallots = votes.filter((vote) => vote.type === 'accuse' && vote.targetPlayerId === targetId);
     const summary = buildVoteSummary(session, targetId, targetBallots);
+    const actualRole = session.assignments?.[targetId]?.role || 'civil';
 
     session.alivePlayerIds = (session.alivePlayerIds || []).filter((entryId) => entryId !== targetId);
 
+    if (actualRole === 'mrwhite') {
+        const fallbackWinner = determineWinner(session);
+        startMrWhiteGuessPhase(session, {
+            playerId: targetId,
+            reason: 'eliminated',
+            baseWinner: fallbackWinner,
+            sourceSummary: summary
+        });
+        session.lastRoundSummary = summary;
+        return;
+    }
+
     const winner = determineWinner(session);
     if (winner) {
+        if (winner.team === 'mrwhite' || winner.team === 'special') {
+            const mrWhitePlayer = getMrWhitePlayer(session, true);
+            if (mrWhitePlayer) {
+                startMrWhiteGuessPhase(session, {
+                    playerId: mrWhitePlayer.id,
+                    reason: 'winner',
+                    baseWinner: winner,
+                    sourceSummary: summary
+                });
+                session.lastRoundSummary = summary;
+                return;
+            }
+        }
         finishSession(session, summary, winner);
         return;
     }
@@ -504,6 +663,7 @@ function buildSessionView(session, playerId) {
             acknowledged: acknowledgedSet.has(entry.id),
             clueSubmitted: session.clues.some((clue) => clue.playerId === entry.id),
             hasVoted: Boolean(session.votes && session.votes[entry.id]),
+            pastClues: getPlayerPastClues(session, entry.id),
             revealedRole: !aliveIds.has(entry.id) || session.status === 'finished'
                 ? session.assignments?.[entry.id]?.role || null
                 : null
@@ -537,6 +697,14 @@ function buildSessionView(session, playerId) {
             text: message.text,
             sentAt: message.sentAt
         })),
+        mrWhiteGuess: session.mrWhiteGuess ? {
+            id: session.mrWhiteGuess.id,
+            playerId: session.mrWhiteGuess.playerId,
+            playerName: session.mrWhiteGuess.playerName,
+            reason: session.mrWhiteGuess.reason,
+            canGuess: session.mrWhiteGuess.playerId === playerId
+        } : null,
+        mrWhiteGuessResult: session.mrWhiteGuessResult || null,
         canChat: session.status === 'discussion' && aliveIds.has(playerId),
         canVote: session.status === 'discussion' && aliveIds.has(playerId) && !playerVote,
         yourVote: playerVote ? {
@@ -551,6 +719,61 @@ function buildSessionView(session, playerId) {
         lastRoundSummary: session.lastRoundSummary,
         winner: session.winner
     };
+}
+
+function resolveMrWhiteGuess(session, guessedWord, skipped = false) {
+    const guessContext = session.mrWhiteGuess;
+    if (!guessContext) {
+        return null;
+    }
+
+    const civilWord = getCivilWord(session);
+    const success = !skipped && Boolean(civilWord) && normalizeSecretWord(guessedWord) === normalizeSecretWord(civilWord);
+    const resultId = randomMessageId();
+    let nextWinner = null;
+    let nextSummary = guessContext.sourceSummary || session.lastRoundSummary || null;
+
+    if (success) {
+        nextWinner = guessContext.successWinner;
+        session.mrWhiteGuessResult = buildMrWhiteGuessResultPayload(
+            resultId,
+            'Mot dechiffre',
+            `${guessContext.playerName} a reussi a dechiffrer le mot des civils : ${civilWord}.`,
+            true
+        );
+        finishSession(session, nextSummary, nextWinner);
+        return session.mrWhiteGuessResult;
+    }
+
+    if (guessContext.fallbackWinner) {
+        nextWinner = guessContext.fallbackWinner;
+        const failureMessage = guessContext.reason === 'winner'
+            ? `${guessContext.playerName} gagne, mais ne connait pas le mot des civils.`
+            : `${guessContext.playerName} n a pas retrouve le mot des civils.`;
+        session.mrWhiteGuessResult = buildMrWhiteGuessResultPayload(
+            resultId,
+            'Mot inconnu',
+            failureMessage,
+            false
+        );
+        finishSession(session, nextSummary, nextWinner);
+        return session.mrWhiteGuessResult;
+    }
+
+    nextSummary = {
+        roundNumber: session.roundNumber,
+        type: 'mrwhite_failed',
+        title: 'MrWhite elimine',
+        message: `${guessContext.playerName} n a pas retrouve le mot des civils. Un nouveau tour commence.`
+    };
+    session.mrWhiteGuessResult = buildMrWhiteGuessResultPayload(
+        resultId,
+        'Mot inconnu',
+        `${guessContext.playerName} n a pas retrouve le mot des civils. La partie continue sans lui.`,
+        false
+    );
+    beginNextRound(session, nextSummary);
+    return session.mrWhiteGuessResult;
 }
 
 async function readJsonBody(req) {
@@ -625,11 +848,14 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             alivePlayerIds: [hostPlayerId],
             secretAcknowledged: new Set(),
             clues: [],
+            clueHistory: [],
             activeClueIndex: 0,
             roundNumber: 1,
             discussionMessages: [],
             votes: {},
             turnOrderPlayerIds: null,
+            mrWhiteGuess: null,
+            mrWhiteGuessResult: null,
             lastRoundSummary: null,
             winner: null,
             createdAt: Date.now(),
@@ -858,10 +1084,13 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         session.turnOrderPlayerIds = shuffle(session.players.map((entry) => entry.id));
         session.secretAcknowledged = new Set();
         session.clues = [];
+        session.clueHistory = [];
         session.activeClueIndex = 0;
         session.roundNumber = 1;
         session.discussionMessages = [];
         session.votes = {};
+        session.mrWhiteGuess = null;
+        session.mrWhiteGuessResult = null;
         session.lastRoundSummary = null;
         session.winner = null;
         session.status = 'secrets';
@@ -895,6 +1124,43 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         returnSessionToWaiting(session);
+        updateSessionRevision(session);
+        sendJson(res, 200, buildSessionView(session, player.id));
+        return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/session/mrwhite-guess') {
+        const body = await readJsonBody(req);
+        const session = ensureSession(body.code);
+        if (!session) {
+            sendError(res, 404, 'Cette session est introuvable.');
+            return;
+        }
+
+        const player = ensurePlayer(session, body.playerId);
+        if (!player) {
+            sendError(res, 403, 'Joueur non reconnu pour cette session.');
+            return;
+        }
+
+        if (session.status !== 'mrwhite_guess' || !session.mrWhiteGuess) {
+            sendError(res, 400, 'MrWhite ne peut pas dechiffrer le mot pour le moment.');
+            return;
+        }
+
+        if (session.mrWhiteGuess.playerId !== player.id) {
+            sendError(res, 403, 'Seul MrWhite peut dechiffrer le mot des civils.');
+            return;
+        }
+
+        const guessedWord = String(body.guessedWord || '').replace(/\s+/g, ' ').trim().substring(0, 24);
+        const skipped = Boolean(body.skip);
+        if (!skipped && !guessedWord) {
+            sendError(res, 400, 'Entre un mot avant de valider.');
+            return;
+        }
+
+        resolveMrWhiteGuess(session, guessedWord, skipped);
         updateSessionRevision(session);
         sendJson(res, 200, buildSessionView(session, player.id));
         return;
@@ -979,6 +1245,11 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         }
 
         session.clues.push({
+            playerId: player.id,
+            text
+        });
+        session.clueHistory.push({
+            roundNumber: session.roundNumber,
             playerId: player.id,
             text
         });

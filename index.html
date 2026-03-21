@@ -1302,6 +1302,47 @@
         .online-clue-player-label--self {
             color: #ffd88d;
         }
+        .online-clue-player-history {
+            min-height: 14px;
+            margin: -4px 0 0;
+            font-size: 0.72rem;
+            line-height: 1.25;
+            text-align: center;
+            color: rgba(188, 188, 188, 0.54);
+            letter-spacing: 0.01rem;
+            opacity: 0;
+            transform: translateY(5px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .online-clue-player-history--visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .online-clue-player-history--animate {
+            animation: cluePlayerLabelReveal 360ms ease-out 360ms both;
+        }
+        .online-clue-player-history--self {
+            color: rgba(196, 221, 255, 0.68);
+        }
+        .online-clue-card-history {
+            position: relative;
+            z-index: 1;
+            margin: -2px 0 0;
+            min-height: 16px;
+            font-size: 0.72rem;
+            line-height: 1.25;
+            text-align: center;
+            color: rgba(188, 188, 188, 0.5);
+            letter-spacing: 0.01rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .online-clue-card--self .online-clue-card-history {
+            color: rgba(196, 221, 255, 0.64);
+        }
         .online-clue-card {
             position: relative;
             height: 172px;
@@ -1613,8 +1654,11 @@
         }
         @media (max-width: 980px) {
             body {
+                height: auto;
+                min-height: 100svh;
                 justify-content: flex-start;
                 padding: 10px 0 12px;
+                overflow-y: auto;
             }
             h1, h2 {
                 margin-bottom: 12px;
@@ -1622,19 +1666,19 @@
             }
             .home-shell {
                 width: calc(100% - 32px);
-                min-height: calc(100svh - 86px);
-                max-height: calc(100svh - 86px);
+                min-height: 0;
+                max-height: none;
                 grid-template-columns: 1fr;
                 justify-items: center;
                 align-content: start;
                 gap: 18px;
-                overflow: auto;
-                padding-right: 4px;
-                -webkit-overflow-scrolling: touch;
+                overflow: visible;
+                padding-right: 0;
             }
             .home-copy,
             .home-side-card {
                 padding: 26px 22px;
+                max-height: none;
             }
             .home-copy,
             .home-side-card--left,
@@ -1656,17 +1700,17 @@
             }
             .waiting-layout {
                 width: calc(100% - 32px);
-                height: calc(100svh - 86px);
+                height: auto;
+                min-height: 0;
                 padding: 0 16px;
                 align-items: stretch;
             }
             .waiting-stage {
-                height: 100%;
+                height: auto;
                 align-items: start;
                 align-content: start;
-                overflow: auto;
-                padding-right: 4px;
-                -webkit-overflow-scrolling: touch;
+                overflow: visible;
+                padding-right: 0;
             }
             .waiting-main,
             .waiting-side,
@@ -1678,12 +1722,11 @@
                 width: calc(100% - 32px);
                 padding: 0 16px;
                 grid-template-columns: 1fr;
-                height: calc(100svh - 86px);
-                min-height: calc(100svh - 86px);
+                height: auto;
+                min-height: 0;
                 align-items: start;
-                overflow: auto;
-                padding-right: 12px;
-                -webkit-overflow-scrolling: touch;
+                overflow: visible;
+                padding-right: 16px;
             }
             .online-discussion-column {
                 height: auto;
@@ -1702,12 +1745,12 @@
                 max-height: 280px;
             }
             .online-clue-stage {
-                height: calc(100svh - 86px);
+                height: auto;
+                min-height: 0;
                 align-items: start;
-                overflow: auto;
+                overflow: visible;
                 padding-bottom: 12px;
-                padding-right: 12px;
-                -webkit-overflow-scrolling: touch;
+                padding-right: 16px;
             }
             .online-clue-grid {
                 grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -1716,11 +1759,11 @@
             .local-distribution-shell,
             .local-game-layout {
                 width: calc(100% - 32px);
-                height: calc(100svh - 86px);
+                height: auto;
+                min-height: 0;
                 justify-content: flex-start;
-                overflow: auto;
+                overflow: visible;
                 padding: 4px 16px 12px;
-                -webkit-overflow-scrolling: touch;
             }
             .local-game-layout {
                 grid-template-columns: 1fr;
@@ -1816,6 +1859,8 @@
             .local-game-layout,
             .waiting-layout {
                 width: calc(100% - 20px);
+                padding-left: 10px;
+                padding-right: 10px;
             }
             .online-clue-card {
                 height: 144px;
@@ -1867,6 +1912,9 @@
             }
         }
         @media (max-width: 420px) {
+            body {
+                padding: 6px 0 10px;
+            }
             .home-shell,
             .waiting-layout,
             .online-discussion-layout,
@@ -2085,6 +2133,7 @@
             discussionVoteDialogTargetId: null,
             discussionVoteDialogTargetName: '',
             discussionVoteDialogSelectedRole: '',
+            lastMrWhiteGuessResultId: null,
             discussionChatDraft: '',
             discussionChatShouldRefocus: false,
             discussionChatSelectionStart: null,
@@ -2574,6 +2623,7 @@
             onlineSessionRuntime.lastStatus = null;
             onlineSessionRuntime.discussionVoteSubmitting = false;
             clearDiscussionVoteDialogState();
+            onlineSessionRuntime.lastMrWhiteGuessResultId = null;
             onlineSessionRuntime.discussionChatDraft = '';
             onlineSessionRuntime.discussionChatShouldRefocus = false;
             onlineSessionRuntime.discussionChatSelectionStart = null;
@@ -4013,6 +4063,16 @@
             `;
         }
 
+        function maybeShowMrWhiteGuessResult(view) {
+            const result = view.mrWhiteGuessResult;
+            if (!result?.id || onlineSessionRuntime.lastMrWhiteGuessResultId === result.id) {
+                return;
+            }
+
+            onlineSessionRuntime.lastMrWhiteGuessResultId = result.id;
+            showInfoDialog(result.title || 'Resultat de MrWhite', escapeHtml(result.message || ''));
+        }
+
         function renderOnlineSessionState(view) {
             if (view.status !== 'discussion') {
                 clearDiscussionVoteDialogState();
@@ -4022,25 +4082,35 @@
 
             if (view.status === 'waiting') {
                 renderOnlineWaitingRoom(view);
+                maybeShowMrWhiteGuessResult(view);
                 return;
             }
 
             if (view.status === 'secrets') {
                 renderOnlineSecretScreen(view);
+                maybeShowMrWhiteGuessResult(view);
+                return;
+            }
+
+            if (view.status === 'mrwhite_guess') {
+                renderOnlineMrWhiteGuessScreen(view);
                 return;
             }
 
             if (view.status === 'discussion') {
                 renderOnlineDiscussionScreen(view);
+                maybeShowMrWhiteGuessResult(view);
                 return;
             }
 
             if (view.status === 'finished') {
                 renderOnlineFinishedScreen(view);
+                maybeShowMrWhiteGuessResult(view);
                 return;
             }
 
             renderOnlineClueScreen(view);
+            maybeShowMrWhiteGuessResult(view);
         }
 
         function renderOnlineWaitingRoom(view) {
@@ -4331,6 +4401,115 @@
             }
         }
 
+        function renderOnlineMrWhiteGuessScreen(view) {
+            const guessState = view.mrWhiteGuess;
+            const isMrWhiteGuesser = Boolean(guessState?.canGuess);
+            const title = isMrWhiteGuesser ? 'Dechiffre le mot des civils' : 'En attente de MrWhite';
+            const description = isMrWhiteGuesser
+                ? 'Tu as une derniere chance : essaie de retrouver le mot des civils.'
+                : `${guessState?.playerName || 'MrWhite'} tente de dechiffrer le mot des civils.`;
+
+            document.body.innerHTML = `
+                <div class="silhouette-bg">
+                    <svg class="silhouette" viewBox="0 0 600 220">
+                        <g>
+                            <path d="M120,210 Q110,180 130,170 Q140,160 120,140 Q110,120 130,110 Q150,100 170,110 Q190,120 180,140 Q170,160 190,170 Q210,180 200,210 Z" fill="#fff"/>
+                            <ellipse cx="145" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <path d="M420,210 Q410,180 430,170 Q440,160 420,140 Q410,120 430,110 Q450,100 470,110 Q490,120 480,140 Q470,160 490,170 Q510,180 500,210 Z" fill="#fff"/>
+                            <ellipse cx="445" cy="100" rx="25" ry="30" fill="#fff"/>
+                            <ellipse cx="300" cy="215" rx="180" ry="15" fill="#fff" opacity="0.3"/>
+                        </g>
+                    </svg>
+                </div>
+                <h2>Mot des civils</h2>
+                <div class="single-screen-stack single-screen-stack--narrow">
+                    <div class="waiting-role-card waiting-role-card--host" style="margin:0 auto 18px;">
+                        <div class="waiting-role-badge">MrWhite</div>
+                        <div class="waiting-role-title">${escapeHtml(title)}</div>
+                        <p class="waiting-role-text">${escapeHtml(description)}</p>
+                    </div>
+                    ${renderOnlineRoundSummary(view.lastRoundSummary)}
+                    <div class="waiting-action-row">
+                        <button id="leaveOnlineMrWhiteGuessBtn" type="button" class="button-secondary">Quitter</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('leaveOnlineMrWhiteGuessBtn').addEventListener('click', leaveOnlineSession);
+
+            if (!isMrWhiteGuesser) {
+                return;
+            }
+
+            const existingOverlay = document.querySelector('.dialog-overlay[data-dialog-id="mrwhite-guess"]');
+            if (existingOverlay) {
+                closeDialog(existingOverlay);
+            }
+
+            const overlay = createDialog(`
+                <div class="dialog-kicker">MrWhite</div>
+                <h3>Dechiffre le mot secret</h3>
+                <p>Entre le mot que tu penses etre celui des civils.</p>
+                <input id="mrWhiteGuessInput" class="dialog-input" type="text" maxlength="24" placeholder="Ta proposition...">
+                <div id="mrWhiteGuessError" class="dialog-error" style="display:none;"></div>
+                <div class="dialog-actions">
+                    <button id="submitMrWhiteGuessBtn" type="button">Valider</button>
+                    <button id="skipMrWhiteGuessBtn" type="button" class="button-secondary">Je ne sais pas</button>
+                </div>
+            `);
+            overlay.dataset.dialogId = 'mrwhite-guess';
+
+            const input = document.getElementById('mrWhiteGuessInput');
+            const errorBox = document.getElementById('mrWhiteGuessError');
+            const submitBtn = document.getElementById('submitMrWhiteGuessBtn');
+            const skipBtn = document.getElementById('skipMrWhiteGuessBtn');
+
+            input.focus();
+            input.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    submitGuess(false);
+                }
+            });
+            submitBtn.addEventListener('click', function() {
+                submitGuess(false);
+            });
+            skipBtn.addEventListener('click', function() {
+                submitGuess(true);
+            });
+
+            async function submitGuess(skip = false) {
+                const guessedWord = input.value.trim().substring(0, 24);
+                if (!skip && !guessedWord) {
+                    errorBox.textContent = 'Entre un mot avant de valider.';
+                    errorBox.style.display = 'block';
+                    input.focus();
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                skipBtn.disabled = true;
+                input.disabled = true;
+                errorBox.style.display = 'none';
+
+                try {
+                    await performOnlineAction('/api/session/mrwhite-guess', {
+                        guessedWord,
+                        skip
+                    });
+                    closeDialog(overlay);
+                    await refreshOnlineSession(true);
+                } catch (error) {
+                    submitBtn.disabled = false;
+                    skipBtn.disabled = false;
+                    input.disabled = false;
+                    errorBox.textContent = error.message;
+                    errorBox.style.display = 'block';
+                    input.focus();
+                }
+            }
+        }
+
         function renderOnlineClueScreen(view) {
             if (onlineSessionRuntime.lastClueRound !== view.roundNumber) {
                 onlineSessionRuntime.revealedClueKeys = new Set();
@@ -4346,7 +4525,9 @@
                 const isActive = player.alive && view.activePlayerId === player.id && !isRevealed;
                 const isEliminated = !player.alive;
                 const isSelf = player.id === view.self.id;
+                const pastCluesText = Array.isArray(player.pastClues) ? player.pastClues.join(' · ') : '';
                 const labelClasses = ['online-clue-player-label'];
+                const historyClasses = ['online-clue-player-history'];
                 const cardClasses = ['online-clue-card'];
                 let backStatus = 'Mot encore secret';
 
@@ -4360,6 +4541,12 @@
                     if (isNewReveal) {
                         cardClasses.push('online-clue-card--animate');
                     }
+                    if (pastCluesText) {
+                        historyClasses.push('online-clue-player-history--visible');
+                        if (isNewReveal) {
+                            historyClasses.push('online-clue-player-history--animate');
+                        }
+                    }
                 }
                 if (isActive) {
                     cardClasses.push('online-clue-card--active');
@@ -4370,6 +4557,7 @@
                 if (isSelf) {
                     cardClasses.push('online-clue-card--self');
                     labelClasses.push('online-clue-player-label--self');
+                    historyClasses.push('online-clue-player-history--self');
                 }
 
                 if (isEliminated) {
@@ -4396,11 +4584,13 @@
                 return `
                     <div class="online-clue-card-slot">
                         <div class="${labelClasses.join(' ')}">${playerLabel}</div>
+                        <div class="${historyClasses.join(' ')}">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</div>
                         <div class="${cardClasses.join(' ')}">
                             <div class="online-clue-card-inner">
                                 <article class="online-clue-card-face online-clue-card-face--back">
                                     <div class="online-clue-card-kicker">${backKicker}</div>
                                     <h3 class="online-clue-card-name">${escapeHtml(player.name)}</h3>
+                                    <p class="online-clue-card-history">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                                     <p class="online-clue-card-status">${escapeHtml(backStatus)}</p>
                                 </article>
                                 <article class="online-clue-card-face online-clue-card-face--front">
@@ -4543,6 +4733,7 @@
                     const player = playerInfoById.get(entry.playerId);
                     const isSelfCard = entry.playerId === view.self.id;
                     const label = `${entry.playerName}${entry.playerId === view.self.id ? ' (vous)' : ''}`;
+                    const pastCluesText = Array.isArray(player?.pastClues) ? player.pastClues.join(' · ') : '';
                     const isClickable = Boolean(view.canVote && view.guessRoleOptions.length && player?.alive && !isSelfCard);
                     const isVotedTarget = view.yourVote?.type === 'accuse' && view.yourVote.targetPlayerId === entry.playerId;
                     const cardClasses = ['online-clue-card', 'online-discussion-clue-card', 'online-clue-card--revealed'];
@@ -4578,6 +4769,7 @@
                     return `
                         <div class="online-clue-card-slot">
                             <p class="online-clue-player-label online-clue-player-label--visible ${isSelfCard ? 'online-clue-player-label--self' : ''}">${escapeHtml(label)}</p>
+                            <p class="online-clue-player-history online-clue-player-history--visible ${isSelfCard ? 'online-clue-player-history--self' : ''}">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                             <div class="${cardClasses.join(' ')}" ${isClickable ? `data-player-id="${escapeHtml(entry.playerId)}" data-player-name="${escapeHtml(entry.playerName)}" tabindex="0" role="button"` : ''}>
                                 <div class="online-clue-card-inner">
                                     <div class="online-clue-card-face online-clue-card-face--back">
