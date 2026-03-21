@@ -1347,15 +1347,19 @@
             position: relative;
             height: 172px;
             min-height: 172px;
+            -webkit-perspective: 1400px;
             perspective: 1400px;
+            isolation: isolate;
         }
         .online-clue-card-inner {
             position: relative;
             width: 100%;
             height: 172px;
             min-height: 172px;
+            -webkit-transform-style: preserve-3d;
             transform-style: preserve-3d;
             transition: transform 760ms cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: transform;
         }
         .online-clue-card--revealed .online-clue-card-inner {
             transform: rotateY(180deg);
@@ -1374,7 +1378,10 @@
             border-radius: 20px;
             box-sizing: border-box;
             box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+            -webkit-backface-visibility: hidden;
             backface-visibility: hidden;
+            -webkit-transform-style: preserve-3d;
+            transform-style: preserve-3d;
             overflow: hidden;
         }
         .online-clue-card-face::after {
@@ -1385,13 +1392,14 @@
             pointer-events: none;
         }
         .online-clue-card-face--back {
+            transform: rotateY(0deg) translateZ(1px);
             background:
                 radial-gradient(circle at top right, rgba(255, 197, 107, 0.16), transparent 38%),
                 linear-gradient(160deg, rgba(62, 62, 62, 0.98), rgba(34, 34, 34, 0.98));
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
         .online-clue-card-face--front {
-            transform: rotateY(180deg);
+            transform: rotateY(180deg) translateZ(1px);
             background:
                 radial-gradient(circle at top right, rgba(255, 203, 132, 0.3), transparent 40%),
                 linear-gradient(160deg, rgba(79, 56, 26, 0.98), rgba(34, 30, 24, 0.98));
@@ -1444,6 +1452,15 @@
             line-height: 1.4;
             text-align: center;
             color: rgba(255, 242, 220, 0.76);
+        }
+        .online-clue-card-kicker,
+        .online-clue-card-name,
+        .online-clue-card-status,
+        .online-clue-card-word,
+        .online-clue-card-footnote,
+        .online-clue-card-history {
+            -webkit-transform: translateZ(2px);
+            transform: translateZ(2px);
         }
         .online-clue-card--active .online-clue-card-face--back {
             border-color: rgba(255, 195, 90, 0.44);
@@ -1607,6 +1624,16 @@
             }
             to {
                 transform: rotateY(180deg);
+            }
+        }
+        @keyframes mobileClueCardReveal {
+            from {
+                opacity: 0;
+                transform: scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
             }
         }
         @keyframes cluePlayerLabelReveal {
@@ -1865,14 +1892,45 @@
             .online-clue-card {
                 height: 144px;
                 min-height: 144px;
+                -webkit-perspective: none;
+                perspective: none;
             }
             .online-clue-card-inner {
                 height: 144px;
                 min-height: 144px;
+                transform: none !important;
+                transition: none;
+                will-change: auto;
             }
             .online-clue-card-face {
                 padding: 12px;
                 border-radius: 16px;
+                -webkit-backface-visibility: visible;
+                backface-visibility: visible;
+                transition: opacity 260ms ease, transform 260ms ease;
+            }
+            .online-clue-card-face--back {
+                transform: none;
+                opacity: 1;
+                visibility: visible;
+            }
+            .online-clue-card-face--front {
+                transform: none;
+                opacity: 0;
+                visibility: hidden;
+            }
+            .online-clue-card--revealed .online-clue-card-face--back {
+                opacity: 0;
+                visibility: hidden;
+                transform: scale(0.97);
+            }
+            .online-clue-card--revealed .online-clue-card-face--front {
+                opacity: 1;
+                visibility: visible;
+                transform: scale(1);
+            }
+            .online-clue-card--animate .online-clue-card-face--front {
+                animation: mobileClueCardReveal 360ms ease-out both;
             }
             .online-clue-card-name {
                 font-size: 1rem;
@@ -2426,6 +2484,24 @@
             window.location.href = window.location.pathname;
         }
 
+        function getOnlineSessionExitMessage(message) {
+            const value = String(message || '').trim();
+            const normalizedValue = value.toLowerCase();
+
+            if (
+                normalizedValue.includes("l'hote s'est enfui")
+                || normalizedValue.includes('l hote s est enfui')
+            ) {
+                return value || "L'hote s'est enfui.";
+            }
+
+            if (normalizedValue.includes('ne reconnait pas ce joueur')) {
+                return 'Tu as quitte cette session ou tu as ete exclu par l hote.';
+            }
+
+            return '';
+        }
+
         function showConfirmDialog(title, message, confirmLabel, onConfirm) {
             const overlay = createDialog(`
                 <div class="dialog-kicker">Confirmation</div>
@@ -2700,8 +2776,9 @@
 
             if (!response.ok) {
                 const errorMessage = data.error || `Erreur ${response.status}`;
-                if (errorMessage.includes('ne reconnait pas ce joueur')) {
-                    handleRemovedFromOnlineSession();
+                const exitMessage = getOnlineSessionExitMessage(errorMessage);
+                if (exitMessage) {
+                    handleRemovedFromOnlineSession(exitMessage);
                     throw new Error(errorMessage);
                 }
 
@@ -2758,7 +2835,7 @@
                 scheduleOnlineSessionRefresh();
                 return view;
             } catch (error) {
-                if (error.message.includes('ne reconnait pas ce joueur')) {
+                if (getOnlineSessionExitMessage(error.message)) {
                     return;
                 }
 

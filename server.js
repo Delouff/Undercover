@@ -30,6 +30,8 @@ const motsFrancais = [
 ];
 
 const sessions = new Map();
+const closedSessions = new Map();
+const CLOSED_SESSION_TTL_MS = 10 * 60 * 1000;
 
 function sendJson(res, statusCode, payload) {
     const body = JSON.stringify(payload);
@@ -42,6 +44,48 @@ function sendJson(res, statusCode, payload) {
 
 function sendError(res, statusCode, message) {
     sendJson(res, statusCode, { error: message });
+}
+
+function pruneClosedSessions() {
+    const now = Date.now();
+    for (const [code, entry] of closedSessions.entries()) {
+        if (!entry || entry.expiresAt <= now) {
+            closedSessions.delete(code);
+        }
+    }
+}
+
+function rememberClosedSession(code, message) {
+    const normalizedCode = String(code || '').trim().toUpperCase();
+    if (!normalizedCode || !message) {
+        return;
+    }
+
+    pruneClosedSessions();
+    closedSessions.set(normalizedCode, {
+        message,
+        expiresAt: Date.now() + CLOSED_SESSION_TTL_MS
+    });
+}
+
+function getClosedSessionMessage(code) {
+    const normalizedCode = String(code || '').trim().toUpperCase();
+    if (!normalizedCode) {
+        return '';
+    }
+
+    pruneClosedSessions();
+    return closedSessions.get(normalizedCode)?.message || '';
+}
+
+function sendMissingSessionError(res, code) {
+    const closedMessage = getClosedSessionMessage(code);
+    if (closedMessage) {
+        sendError(res, 410, closedMessage);
+        return;
+    }
+
+    sendError(res, 404, 'Cette session est introuvable.');
 }
 
 function normalizePlayerName(value) {
@@ -101,8 +145,9 @@ function normalizeVoteRole(value) {
 function randomCode() {
     let code = '';
     do {
+        pruneClosedSessions();
         code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    } while (sessions.has(code));
+    } while (sessions.has(code) || closedSessions.has(code));
     return code;
 }
 
@@ -209,7 +254,16 @@ function removePlayerFromSession(session, playerId) {
     }
 
     if (session.hostPlayerId === playerId) {
-        session.hostPlayerId = session.players[0].id;
+        const hostEscapeMessage = "L'hote s'est enfui.";
+        sessions.delete(session.code);
+        rememberClosedSession(session.code, hostEscapeMessage);
+        return {
+            removed: true,
+            deleted: true,
+            removedPlayer,
+            closedByHost: true,
+            message: hostEscapeMessage
+        };
     }
 
     if (session.status === 'mrwhite_guess' && session.mrWhiteGuess?.playerId === playerId) {
@@ -886,7 +940,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const session = ensureSession(code);
 
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, code);
             return;
         }
 
@@ -941,7 +995,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const session = ensureSession(code);
 
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, code);
             return;
         }
 
@@ -975,7 +1029,9 @@ async function handleApiRequest(req, res, pathname, searchParams) {
 
         sendJson(res, 200, {
             left: true,
-            deleted: removal.deleted
+            deleted: removal.deleted,
+            closedByHost: Boolean(removal.closedByHost),
+            message: removal.message || ''
         });
         return;
     }
@@ -984,7 +1040,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
@@ -1030,7 +1086,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
@@ -1066,7 +1122,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
@@ -1110,7 +1166,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
@@ -1140,7 +1196,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
@@ -1177,7 +1233,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
@@ -1207,7 +1263,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
@@ -1280,7 +1336,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
@@ -1323,7 +1379,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const body = await readJsonBody(req);
         const session = ensureSession(body.code);
         if (!session) {
-            sendError(res, 404, 'Cette session est introuvable.');
+            sendMissingSessionError(res, body.code);
             return;
         }
 
