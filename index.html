@@ -1153,22 +1153,33 @@
         }
         .online-discussion-clue-hover {
             position: absolute;
-            left: 12px;
-            right: 12px;
-            bottom: 12px;
+            inset: 0;
             z-index: 2;
-            padding: 8px 10px;
-            border-radius: 12px;
-            background: rgba(12, 12, 12, 0.8);
-            color: #ffe6bc;
-            font-size: 0.82rem;
-            font-weight: 700;
-            text-align: center;
-            letter-spacing: 0.02rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(8, 8, 8, 0.12), rgba(8, 8, 8, 0.58));
             opacity: 0;
             transform: translateY(8px);
             transition: opacity 0.18s ease, transform 0.18s ease;
             pointer-events: none;
+        }
+        .online-discussion-clue-hover span {
+            display: block;
+            max-width: 100%;
+            padding: 9px 12px;
+            border-radius: 12px;
+            background: rgba(16, 16, 16, 0.72);
+            color: #ffe6bc;
+            font-size: 0.86rem;
+            font-weight: 700;
+            line-height: 1.3;
+            text-align: center;
+            letter-spacing: 0.01rem;
+            overflow-wrap: anywhere;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
         }
         .online-discussion-clue-card--selectable:hover .online-discussion-clue-hover,
         .online-discussion-clue-card--selectable:focus-within .online-discussion-clue-hover {
@@ -1870,7 +1881,9 @@
             lastStatus: null,
             revealedClueKeys: new Set(),
             lastClueRound: null,
-            discussionVoteSubmitting: false
+            discussionVoteSubmitting: false,
+            discussionChatDraft: '',
+            discussionChatShouldRefocus: false
         };
         const ONLINE_AUTH_STORAGE_KEY = 'undercover_online_auth';
         const PUBLIC_SHARE_URL_STORAGE_KEY = 'undercover_public_share_url';
@@ -2323,6 +2336,8 @@
             onlineSessionRuntime.lastRevision = null;
             onlineSessionRuntime.lastStatus = null;
             onlineSessionRuntime.discussionVoteSubmitting = false;
+            onlineSessionRuntime.discussionChatDraft = '';
+            onlineSessionRuntime.discussionChatShouldRefocus = false;
             window.localStorage.removeItem(ONLINE_AUTH_STORAGE_KEY);
         }
 
@@ -2415,6 +2430,12 @@
             if (!onlineSessionRuntime.auth) return;
 
             try {
+                const currentChatInput = document.getElementById('onlineChatInput');
+                if (currentChatInput) {
+                    onlineSessionRuntime.discussionChatDraft = currentChatInput.value || '';
+                    onlineSessionRuntime.discussionChatShouldRefocus = document.activeElement === currentChatInput;
+                }
+
                 const auth = onlineSessionRuntime.auth;
                 const query = new URLSearchParams({
                     code: auth.code,
@@ -3681,6 +3702,11 @@
         }
 
         function renderOnlineSessionState(view) {
+            if (view.status !== 'discussion') {
+                onlineSessionRuntime.discussionChatDraft = '';
+                onlineSessionRuntime.discussionChatShouldRefocus = false;
+            }
+
             if (view.status === 'waiting') {
                 renderOnlineWaitingRoom(view);
                 return;
@@ -4328,12 +4354,21 @@
                 message: 'Revenir au salon et interrompre la partie en cours ?'
             });
 
+            const chatFeed = document.querySelector('.online-chat-feed');
             const chatInput = document.getElementById('onlineChatInput');
             const chatError = document.getElementById('onlineChatError');
             const chatButton = document.getElementById('sendOnlineChatBtn');
             const chatCounter = document.getElementById('onlineChatCounter');
 
+            if (chatFeed) {
+                window.requestAnimationFrame(() => {
+                    chatFeed.scrollTop = chatFeed.scrollHeight;
+                });
+            }
+
             if (chatInput && chatError && chatButton && chatCounter) {
+                chatInput.value = String(onlineSessionRuntime.discussionChatDraft || '').substring(0, 100);
+
                 function updateChatCounter() {
                     const length = chatInput.value.length;
                     chatCounter.textContent = `${length} / 100`;
@@ -4341,7 +4376,28 @@
                 }
 
                 updateChatCounter();
-                chatInput.addEventListener('input', updateChatCounter);
+                if (onlineSessionRuntime.discussionChatShouldRefocus) {
+                    window.requestAnimationFrame(() => {
+                        chatInput.focus();
+                        const draftLength = chatInput.value.length;
+                        try {
+                            chatInput.setSelectionRange(draftLength, draftLength);
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    });
+                }
+
+                chatInput.addEventListener('focus', function() {
+                    onlineSessionRuntime.discussionChatShouldRefocus = true;
+                });
+                chatInput.addEventListener('blur', function() {
+                    onlineSessionRuntime.discussionChatShouldRefocus = false;
+                });
+                chatInput.addEventListener('input', function() {
+                    onlineSessionRuntime.discussionChatDraft = chatInput.value.substring(0, 100);
+                    updateChatCounter();
+                });
                 chatInput.addEventListener('keydown', function(event) {
                     if (event.key === 'Enter') {
                         event.preventDefault();
@@ -4361,6 +4417,7 @@
 
                     try {
                         await performOnlineAction('/api/session/chat', { text });
+                        onlineSessionRuntime.discussionChatDraft = '';
                         chatInput.value = '';
                         updateChatCounter();
                         chatError.style.display = 'none';
