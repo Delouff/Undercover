@@ -73,8 +73,8 @@
                 radial-gradient(circle at center, transparent 34%, rgba(0, 0, 0, 0.42) 76%, rgba(0, 0, 0, 0.72) 100%),
                 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M650 648 C760 608 892 604 1062 642' stroke='rgba(103,74,56,0.58)' stroke-width='18'/%3E%3Cpath d='M822 520 C874 520 914 548 914 598 C914 654 870 696 812 696 C764 696 726 662 726 612 C726 566 760 534 800 534 C842 534 868 560 868 594 C868 622 848 640 826 646' stroke='rgba(136,223,182,0.42)' stroke-width='6'/%3E%3Cellipse cx='816' cy='520' rx='122' ry='76' fill='rgba(38,79,69,0.34)' stroke='rgba(136,223,182,0.28)' stroke-width='4'/%3E%3Ccircle cx='716' cy='506' r='36' fill='rgba(38,79,69,0.34)' stroke='rgba(136,223,182,0.28)' stroke-width='4'/%3E%3Cpath d='M784 472 L876 432' stroke='rgba(136,223,182,0.24)' stroke-width='6'/%3E%3Cpath d='M784 586 L744 656' stroke='rgba(136,223,182,0.22)' stroke-width='6'/%3E%3Cpath d='M848 586 L890 654' stroke='rgba(136,223,182,0.22)' stroke-width='6'/%3E%3Cpath d='M1020 302 C1068 318 1098 346 1086 402' stroke='rgba(217,92,73,0.28)' stroke-width='4' stroke-dasharray='10 12'/%3E%3Cpath d='M1160 220 C1108 238 1070 270 1086 402' stroke='rgba(217,92,73,0.28)' stroke-width='4' stroke-dasharray='10 12'/%3E%3Crect x='972' y='166' width='136' height='88' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Crect x='1122' y='188' width='132' height='82' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Crect x='1026' y='320' width='136' height='88' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Ccircle cx='1020' cy='302' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Ccircle cx='1160' cy='220' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Ccircle cx='1086' cy='402' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Cpath d='M1176 640 C1218 588 1284 572 1334 592 C1298 616 1282 642 1278 672 C1246 652 1210 648 1176 640 Z' fill='rgba(8,11,11,0.28)' stroke='rgba(255,255,255,0.04)' stroke-width='1.2'/%3E%3C/g%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: center center, center 78%;
-            background-size: cover, min(1560px, 118vw) auto;
+            background-position: center center, center 70%;
+            background-size: cover, min(1380px, 102vw) auto;
             opacity: 0.94;
         }
         .silhouette {
@@ -185,6 +185,40 @@
             justify-content: center;
             gap: 12px;
             flex-wrap: wrap;
+        }
+        .dialog-choice-list {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 16px;
+            text-align: left;
+        }
+        .dialog-choice-option {
+            display: block;
+        }
+        .dialog-choice-option input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .dialog-choice-option span {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #d4d4d4;
+            background: #f6f6f6;
+            color: #1f1f1f;
+            font-size: 0.98rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+        }
+        .dialog-choice-option input:checked + span {
+            border-color: #ffb44c;
+            background: #fff2df;
+            color: #6d4300;
+            transform: translateY(-1px);
         }
         .dialog-readonly {
             width: 100%;
@@ -318,7 +352,7 @@
             width: 100%;
             height: 100%;
             opacity: 0.92;
-            transform: translateY(18%);
+            transform: translateY(10%) scale(0.92);
             transform-origin: center;
         }
         .home-board {
@@ -991,9 +1025,9 @@
             height: var(--desktop-shell-height);
             padding: 0 20px;
             display: grid;
-            grid-template-columns: var(--desktop-three-panel-columns);
-            gap: clamp(18px, 2.4vw, 26px);
-            align-items: center;
+            grid-template-columns: minmax(280px, 2fr) minmax(0, 3fr);
+            gap: clamp(20px, 2.6vw, 30px);
+            align-items: stretch;
             margin: 0 auto;
             z-index: 2;
         }
@@ -1003,6 +1037,13 @@
             gap: 12px;
             min-width: 0;
             min-height: 0;
+            height: 100%;
+        }
+        .online-discussion-column--controls {
+            max-width: 360px;
+        }
+        .online-discussion-column--board {
+            min-width: 0;
         }
         .online-discussion-layout .waiting-panel,
         .online-discussion-layout .waiting-role-card {
@@ -1022,12 +1063,121 @@
         .online-discussion-layout .waiting-list-item {
             padding: 9px 12px;
         }
-        .online-vote-panel {
-            align-self: stretch;
-            min-height: 0;
+        .online-discussion-status-card {
+            width: 100%;
         }
-        .online-vote-panel .waiting-list {
-            max-height: 220px;
+        .online-discussion-vote-summary {
+            font-size: 0.96rem;
+            line-height: 1.5;
+            color: #f1f1f1;
+        }
+        .online-discussion-vote-note {
+            font-size: 0.93rem;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.76);
+        }
+        .online-discussion-role-list {
+            display: grid;
+            gap: 10px;
+        }
+        .online-discussion-role-option {
+            display: block;
+        }
+        .online-discussion-role-option input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .online-discussion-role-option span {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 11px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.84);
+            font-size: 0.94rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+        }
+        .online-discussion-role-option input:checked + span {
+            background: rgba(255, 170, 76, 0.16);
+            border-color: rgba(255, 190, 116, 0.42);
+            color: #ffe7bd;
+            transform: translateY(-1px);
+        }
+        .online-discussion-vote-error {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+        .online-discussion-actions {
+            margin-top: auto;
+        }
+        .online-discussion-words-panel {
+            flex: 0 0 auto;
+        }
+        .online-discussion-clue-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+            gap: 12px;
+            align-content: start;
+        }
+        .online-discussion-clue-card {
+            min-height: 164px;
+        }
+        .online-discussion-clue-card .online-clue-card-face--front {
+            position: relative;
+            justify-content: space-between;
+        }
+        .online-discussion-clue-card--selectable {
+            cursor: pointer;
+        }
+        .online-discussion-clue-card--selectable .online-clue-card-face--front {
+            transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .online-discussion-clue-card--selectable:hover .online-clue-card-face--front,
+        .online-discussion-clue-card--selectable:focus-within .online-clue-card-face--front {
+            border-color: rgba(255, 205, 116, 0.66);
+            box-shadow: 0 0 0 1px rgba(255, 205, 116, 0.18), 0 18px 34px rgba(0, 0, 0, 0.28);
+            transform: translateY(-2px);
+        }
+        .online-discussion-clue-card--selected .online-clue-card-face--front {
+            border-color: rgba(255, 205, 116, 0.72);
+            box-shadow: 0 0 0 1px rgba(255, 205, 116, 0.22), 0 18px 34px rgba(0, 0, 0, 0.28);
+        }
+        .online-discussion-clue-card--disabled {
+            cursor: default;
+            opacity: 0.82;
+        }
+        .online-discussion-clue-hover {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            z-index: 2;
+            padding: 8px 10px;
+            border-radius: 12px;
+            background: rgba(12, 12, 12, 0.8);
+            color: #ffe6bc;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 0.02rem;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            pointer-events: none;
+        }
+        .online-discussion-clue-card--selectable:hover .online-discussion-clue-hover,
+        .online-discussion-clue-card--selectable:focus-within .online-discussion-clue-hover {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .online-discussion-column--board .online-chat-panel {
+            flex: 1 1 auto;
+            min-height: 0;
         }
         .online-chat-panel {
             min-height: 0;
@@ -1065,14 +1215,6 @@
             font-size: 0.9rem;
             opacity: 0.72;
             white-space: nowrap;
-        }
-        .online-vote-options {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .online-vote-target {
-            margin-bottom: 0;
         }
         .online-clue-stage {
             width: var(--desktop-shell-width-tight);
@@ -1399,19 +1541,11 @@
             .online-discussion-layout {
                 width: calc(100% - 32px);
                 padding: 0 16px;
-                grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-                grid-template-areas:
-                    "vote center"
-                    "chat chat";
+                grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+                gap: 18px;
             }
-            .online-discussion-column--vote {
-                grid-area: vote;
-            }
-            .online-discussion-column--center {
-                grid-area: center;
-            }
-            .online-discussion-column--chat {
-                grid-area: chat;
+            .online-discussion-column--controls {
+                max-width: none;
             }
             .online-chat-panel {
                 min-height: 0;
@@ -1463,10 +1597,17 @@
                 width: calc(100% - 32px);
                 padding: 0 16px;
                 grid-template-columns: 1fr;
-                grid-template-areas:
-                    "vote"
-                    "center"
-                    "chat";
+                height: auto;
+                min-height: calc(100svh - 124px);
+            }
+            .online-discussion-column {
+                height: auto;
+            }
+            .online-discussion-column--controls {
+                max-width: none;
+            }
+            .online-discussion-column--board .online-chat-panel {
+                min-height: 360px;
             }
             .online-chat-panel {
                 min-height: 0;
@@ -1728,7 +1869,8 @@
             lastRevision: null,
             lastStatus: null,
             revealedClueKeys: new Set(),
-            lastClueRound: null
+            lastClueRound: null,
+            discussionVoteSubmitting: false
         };
         const ONLINE_AUTH_STORAGE_KEY = 'undercover_online_auth';
         const PUBLIC_SHARE_URL_STORAGE_KEY = 'undercover_public_share_url';
@@ -2180,6 +2322,7 @@
             onlineSessionRuntime.auth = null;
             onlineSessionRuntime.lastRevision = null;
             onlineSessionRuntime.lastStatus = null;
+            onlineSessionRuntime.discussionVoteSubmitting = false;
             window.localStorage.removeItem(ONLINE_AUTH_STORAGE_KEY);
         }
 
@@ -4013,29 +4156,61 @@
         }
 
         function renderOnlineDiscussionScreen(view) {
-            const playersBlock = view.players.map((player) => {
-                let subtitle = player.alive
-                    ? (player.hasVoted ? 'Vote envoye.' : 'Debat en cours...')
-                    : `Elimine${player.revealedRole ? ` (${getOnlineRoleLabel(player.revealedRole)})` : ''}`;
+            const playerInfoById = new Map(view.players.map((player) => [player.id, player]));
 
-                if (player.id === view.self.id && player.alive && player.hasVoted) {
-                    subtitle = 'Tu as deja vote pour ce debat.';
-                }
+            const cluesHtml = view.clues.length
+                ? view.clues.map((entry) => {
+                    const player = playerInfoById.get(entry.playerId);
+                    const label = `${entry.playerName}${entry.playerId === view.self.id ? ' (vous)' : ''}`;
+                    const isClickable = Boolean(view.canVote && view.guessRoleOptions.length && player?.alive);
+                    const isVotedTarget = view.yourVote?.type === 'accuse' && view.yourVote.targetPlayerId === entry.playerId;
+                    const cardClasses = ['online-clue-card', 'online-discussion-clue-card', 'online-clue-card--revealed'];
+                    let footnote = 'Carte revelee';
 
-                return `
-                    <div class="waiting-list-item ${player.alive ? 'waiting-list-item--guest' : 'waiting-list-item--placeholder'}">
-                        <div class="waiting-item-title">${escapeHtml(player.name)}${player.id === view.self.id ? ' (vous)' : ''}</div>
-                        <div class="waiting-item-subtitle">${subtitle}</div>
-                    </div>
-                `;
-            }).join('');
+                    if (isClickable) {
+                        cardClasses.push('online-discussion-clue-card--selectable');
+                        footnote = 'Clique pour ouvrir le vote';
+                    } else {
+                        cardClasses.push('online-discussion-clue-card--disabled');
+                        if (view.yourVote?.type === 'skip') {
+                            footnote = 'Tu as passe ce debat';
+                        } else if (isVotedTarget && view.yourVote?.guessedRoleLabel) {
+                            footnote = `Ton vote : ${view.yourVote.guessedRoleLabel}`;
+                        } else if (player?.hasVoted) {
+                            footnote = 'Vote envoye';
+                        } else if (!view.self.alive) {
+                            footnote = 'Mode spectateur';
+                        } else {
+                            footnote = 'Debat en cours';
+                        }
+                    }
 
-            const cluesHtml = view.clues.map((entry) => `
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border-radius:12px;background:#3a3a3a;">
-                    <span style="font-size:1rem;color:#fff;">${escapeHtml(entry.playerName)}</span>
-                    <span style="font-size:0.98rem;text-align:right;font-weight:bold;color:#fff;">${escapeHtml(entry.text)}</span>
-                </div>
-            `).join('');
+                    if (isVotedTarget) {
+                        cardClasses.push('online-discussion-clue-card--selected');
+                    }
+
+                    return `
+                        <div class="online-clue-card-slot">
+                            <p class="online-clue-player-label online-clue-player-label--visible">${escapeHtml(label)}</p>
+                            <div class="${cardClasses.join(' ')}" ${isClickable ? `data-player-id="${escapeHtml(entry.playerId)}" data-player-name="${escapeHtml(entry.playerName)}" tabindex="0" role="button"` : ''}>
+                                <div class="online-clue-card-inner">
+                                    <div class="online-clue-card-face online-clue-card-face--back">
+                                        <div class="online-clue-card-kicker">Carte du joueur</div>
+                                        <p class="online-clue-card-name">${escapeHtml(entry.playerName)}</p>
+                                        <p class="online-clue-card-status">Le mot a deja ete revele.</p>
+                                    </div>
+                                    <div class="online-clue-card-face online-clue-card-face--front">
+                                        <div class="online-clue-card-kicker">Mot du tour</div>
+                                        <p class="online-clue-card-word">${escapeHtml(entry.text)}</p>
+                                        <p class="online-clue-card-footnote">${escapeHtml(footnote)}</p>
+                                        ${isClickable ? '<div class="online-discussion-clue-hover">Eliminer ce joueur</div>' : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')
+                : `<div style="padding:14px;border-radius:12px;background:#3a3a3a;color:#ddd;">Les cartes des mots apparaitront ici une fois tous les indices reveles.</div>`;
 
             const chatMessagesHtml = view.discussionMessages.length
                 ? view.discussionMessages.map((message) => `
@@ -4046,50 +4221,28 @@
                 `).join('')
                 : `<div style="padding:14px;border-radius:12px;background:#3a3a3a;color:#ddd;">Aucun message pour l'instant. Lancez le debat avant de voter.</div>`;
 
-            const aliveTargets = view.players.filter((player) => player.alive);
-            const targetOptions = aliveTargets.map((player) => `
-                <option value="${escapeHtml(player.id)}">${escapeHtml(player.name)}</option>
-            `).join('');
-            const roleOptions = view.guessRoleOptions.map((role, index) => `
-                <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#3a3a3a;color:#f1f1f1;cursor:pointer;">
-                    <input type="radio" name="onlineVoteRole" value="${escapeHtml(role.id)}" ${index === 0 ? 'checked' : ''}>
-                    <span>${escapeHtml(role.label)}</span>
-                </label>
-            `).join('');
-
-            let voteCard = '';
+            let controlPanel = '';
             if (!view.self.alive) {
-                voteCard = `
-                    <div class="waiting-panel" style="width:100%;">
-                        <div class="waiting-panel-title">Vote</div>
-                        <div style="font-size:0.98rem;line-height:1.55;color:#ddd;">Tu observes le debat, mais tu ne peux plus voter car tu as ete elimine.</div>
+                controlPanel = `
+                    <div class="waiting-panel online-discussion-status-card">
+                        <div class="waiting-panel-title">Observation</div>
+                        <div class="online-discussion-vote-summary">${view.votesSubmittedCount}/${view.eligibleVotersCount} joueur(s) ont vote.</div>
+                        <div class="online-discussion-vote-note">Tu observes le debat, mais tu ne peux plus voter car tu as ete elimine.</div>
                     </div>
                 `;
             } else if (view.canVote) {
-                voteCard = `
-                    <div class="waiting-panel" style="width:100%;">
+                controlPanel = `
+                    <div class="waiting-panel online-discussion-status-card">
                         <div class="waiting-panel-title">Ton vote</div>
-                        <div style="display:flex;flex-direction:column;gap:14px;">
-                            <label style="display:flex;align-items:center;gap:10px;color:#f1f1f1;">
-                                <input type="radio" name="onlineVoteType" value="accuse" ${view.guessRoleOptions.length ? 'checked' : ''}>
-                                <span>Voter pour un joueur</span>
-                            </label>
-                            <label style="display:flex;align-items:center;gap:10px;color:#f1f1f1;">
-                                <input type="radio" name="onlineVoteType" value="skip" ${view.guessRoleOptions.length ? '' : 'checked'}>
-                                <span>Skip le debat</span>
-                            </label>
-                            <div id="onlineVoteAccuseFields" style="display:${view.guessRoleOptions.length ? 'flex' : 'none'};flex-direction:column;gap:12px;">
-                                <select id="onlineVoteTarget" class="dialog-input">
-                                    ${targetOptions}
-                                </select>
-                                <div style="display:flex;flex-direction:column;gap:10px;">
-                                    ${roleOptions || '<div style="color:#ddd;">Aucun role special actif dans cette partie.</div>'}
-                                </div>
-                            </div>
-                            <div id="onlineVoteError" class="dialog-error" style="display:none;"></div>
-                            <div class="waiting-action-row" style="justify-content:flex-start;">
-                                <button id="submitOnlineVoteBtn" type="button">Valider mon vote</button>
-                            </div>
+                        <div class="online-discussion-vote-summary">${view.votesSubmittedCount}/${view.eligibleVotersCount} joueur(s) ont vote.</div>
+                        <div class="online-discussion-vote-note">
+                            ${view.guessRoleOptions.length
+                                ? 'Clique sur une carte revelee. Une popup te laissera choisir le role suspecte au moment du vote.'
+                                : 'Aucun role special nest actif. Tu peux seulement passer ce debat.'}
+                        </div>
+                        <div id="onlineVoteError" class="dialog-error online-discussion-vote-error" style="display:none;"></div>
+                        <div class="waiting-action-row" style="justify-content:flex-start;">
+                            <button id="skipOnlineVoteBtn" type="button" class="button-secondary">Skip le debat</button>
                         </div>
                     </div>
                 `;
@@ -4097,10 +4250,11 @@
                 const voteText = view.yourVote.type === 'skip'
                     ? 'Tu as choisi de passer ce debat.'
                     : `Tu votes contre ${escapeHtml(view.yourVote.targetPlayerName)} comme ${escapeHtml(view.yourVote.guessedRoleLabel)}.`;
-                voteCard = `
-                    <div class="waiting-panel" style="width:100%;">
+                controlPanel = `
+                    <div class="waiting-panel online-discussion-status-card">
                         <div class="waiting-panel-title">Vote envoye</div>
-                        <div style="font-size:0.98rem;line-height:1.55;color:#ddd;">${voteText}</div>
+                        <div class="online-discussion-vote-summary">${view.votesSubmittedCount}/${view.eligibleVotersCount} joueur(s) ont vote.</div>
+                        <div class="online-discussion-vote-note">${voteText}</div>
                     </div>
                 `;
             }
@@ -4138,38 +4292,25 @@
                 </div>
                 <h2>Debat du tour ${view.roundNumber}</h2>
                 <div class="online-discussion-layout">
-                    <div class="online-discussion-column online-discussion-column--vote">
-                        <div class="waiting-panel online-vote-panel">
-                            <div class="waiting-panel-title">Votes</div>
-                            <div style="font-size:1rem;line-height:1.5;color:#f1f1f1;margin-bottom:12px;">
-                                ${view.votesSubmittedCount}/${view.eligibleVotersCount} joueur(s) ont vote.
-                            </div>
-                            <div class="waiting-list">
-                                ${playersBlock}
-                            </div>
-                        </div>
-                        ${voteCard}
-                        <div class="waiting-panel">
-                            <div class="waiting-panel-title">Rappel</div>
-                            <div style="font-size:0.98rem;line-height:1.6;color:#ddd;">
-                                Choisis un joueur et le role que tu lui attribues, ou passe le debat avec <b>Skip</b>. Le tour suivant commencera automatiquement une fois tous les votes recus.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="online-discussion-column online-discussion-column--center">
+                    <div class="online-discussion-column online-discussion-column--controls">
                         ${renderOnlineRoundSummary(view.lastRoundSummary)}
-                        <div class="waiting-panel">
-                            <div class="waiting-panel-title">Mots du tour</div>
-                            <div class="waiting-list">
-                                ${cluesHtml}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="online-discussion-column online-discussion-column--chat">
                         <div class="waiting-role-card waiting-role-card--host" style="margin:0;">
                             <div class="waiting-role-badge">Debat</div>
                             <div class="waiting-role-title">Discutez puis votez</div>
                             <p class="waiting-role-text">Le debat se termine automatiquement des que tous les joueurs encore en vie ont vote.</p>
+                        </div>
+                        ${controlPanel}
+                        <div class="waiting-action-row online-discussion-actions" style="justify-content:flex-start;">
+                            ${view.isHost ? '<button id="returnOnlineDiscussionLobbyBtn" type="button" class="button-secondary">Retour au salon</button>' : ''}
+                            <button id="leaveOnlineDiscussionBtn" type="button" class="button-secondary">Quitter</button>
+                        </div>
+                    </div>
+                    <div class="online-discussion-column online-discussion-column--board">
+                        <div class="waiting-panel online-discussion-words-panel">
+                            <div class="waiting-panel-title">Mots du tour</div>
+                            <div class="online-discussion-clue-grid">
+                                ${cluesHtml}
+                            </div>
                         </div>
                         <div class="waiting-panel online-chat-panel">
                             <div class="waiting-panel-title">Chat du debat</div>
@@ -4177,10 +4318,6 @@
                                 ${chatMessagesHtml}
                             </div>
                             ${chatComposer}
-                        </div>
-                        <div class="waiting-action-row" style="justify-content:flex-start;">
-                            ${view.isHost ? '<button id="returnOnlineDiscussionLobbyBtn" type="button" class="button-secondary">Retour au salon</button>' : ''}
-                            <button id="leaveOnlineDiscussionBtn" type="button" class="button-secondary">Quitter</button>
                         </div>
                     </div>
                 </div>
@@ -4235,53 +4372,108 @@
                 }
             }
 
-            const voteButton = document.getElementById('submitOnlineVoteBtn');
             const voteError = document.getElementById('onlineVoteError');
-            const accuseFields = document.getElementById('onlineVoteAccuseFields');
-            const voteTypeInputs = document.querySelectorAll('input[name="onlineVoteType"]');
 
-            if (voteButton && voteError) {
-                function syncVoteFields() {
-                    const selectedType = document.querySelector('input[name="onlineVoteType"]:checked')?.value;
-                    if (accuseFields) {
-                        accuseFields.style.display = selectedType === 'accuse' ? 'flex' : 'none';
-                    }
-                }
-
-                voteTypeInputs.forEach((input) => input.addEventListener('change', syncVoteFields));
-                syncVoteFields();
-
-                voteButton.addEventListener('click', async function() {
-                    const selectedType = document.querySelector('input[name="onlineVoteType"]:checked')?.value || 'skip';
-                    const body = { type: selectedType };
-
-                    if (selectedType === 'accuse') {
-                        const target = document.getElementById('onlineVoteTarget')?.value || '';
-                        const role = document.querySelector('input[name="onlineVoteRole"]:checked')?.value || '';
-
-                        if (!target) {
-                            voteError.textContent = 'Choisis un joueur a viser.';
-                            voteError.style.display = 'block';
-                            return;
-                        }
-
-                        if (!role) {
-                            voteError.textContent = 'Choisis le role que tu suspectes.';
-                            voteError.style.display = 'block';
-                            return;
-                        }
-
-                        body.targetPlayerId = target;
-                        body.guessedRole = role;
-                    }
-
+            const skipVoteBtn = document.getElementById('skipOnlineVoteBtn');
+            if (skipVoteBtn && voteError) {
+                skipVoteBtn.addEventListener('click', async function() {
+                    if (onlineSessionRuntime.discussionVoteSubmitting) return;
+                    onlineSessionRuntime.discussionVoteSubmitting = true;
                     try {
-                        await performOnlineAction('/api/session/vote', body);
+                        await performOnlineAction('/api/session/vote', { type: 'skip' });
                         await refreshOnlineSession(true);
                     } catch (error) {
                         voteError.textContent = error.message;
                         voteError.style.display = 'block';
+                    } finally {
+                        onlineSessionRuntime.discussionVoteSubmitting = false;
                     }
+                });
+            }
+
+            const clickableCards = document.querySelectorAll('.online-discussion-clue-card--selectable[data-player-id]');
+            if (clickableCards.length && voteError) {
+                function openVoteDialog(targetPlayerId, targetPlayerName) {
+                    const optionsHtml = view.guessRoleOptions.map((role, index) => `
+                        <label class="dialog-choice-option">
+                            <input type="radio" name="discussionVoteRoleChoice" value="${escapeHtml(role.id)}" ${index === 0 ? 'checked' : ''}>
+                            <span>${escapeHtml(role.label)}</span>
+                        </label>
+                    `).join('');
+
+                    const overlay = createDialog(`
+                        <div class="dialog-kicker">Vote</div>
+                        <h3>Eliminer ${escapeHtml(targetPlayerName)} ?</h3>
+                        <p>Choisis le role que tu attribues a ce joueur avant de valider ton vote.</p>
+                        <div class="dialog-choice-list">
+                            ${optionsHtml}
+                        </div>
+                        <div id="discussionVoteDialogError" class="dialog-error" style="display:none;"></div>
+                        <div class="dialog-actions">
+                            <button id="discussionVoteDialogConfirmBtn" type="button">Valider le vote</button>
+                            <button id="discussionVoteDialogCancelBtn" type="button" class="button-secondary">Annuler</button>
+                        </div>
+                    `);
+
+                    const errorBox = document.getElementById('discussionVoteDialogError');
+                    const confirmBtn = document.getElementById('discussionVoteDialogConfirmBtn');
+                    const cancelBtn = document.getElementById('discussionVoteDialogCancelBtn');
+
+                    cancelBtn.addEventListener('click', function() {
+                        closeDialog(overlay);
+                    });
+
+                    confirmBtn.addEventListener('click', async function() {
+                        const role = document.querySelector('input[name="discussionVoteRoleChoice"]:checked')?.value || '';
+                        if (!role) {
+                            errorBox.textContent = 'Choisis un role avant de valider.';
+                            errorBox.style.display = 'block';
+                            return;
+                        }
+
+                        await submitCardVote(targetPlayerId, role, overlay);
+                    });
+                }
+
+                async function submitCardVote(targetPlayerId, role, overlay = null) {
+                    if (onlineSessionRuntime.discussionVoteSubmitting) return;
+                    onlineSessionRuntime.discussionVoteSubmitting = true;
+                    voteError.style.display = 'none';
+
+                    try {
+                        await performOnlineAction('/api/session/vote', {
+                            type: 'accuse',
+                            targetPlayerId,
+                            guessedRole: role
+                        });
+                        if (overlay) {
+                            closeDialog(overlay);
+                        }
+                        await refreshOnlineSession(true);
+                    } catch (error) {
+                        if (overlay) {
+                            const errorBox = document.getElementById('discussionVoteDialogError');
+                            if (errorBox) {
+                                errorBox.textContent = error.message;
+                                errorBox.style.display = 'block';
+                            }
+                        } else {
+                            voteError.textContent = error.message;
+                            voteError.style.display = 'block';
+                        }
+                    } finally {
+                        onlineSessionRuntime.discussionVoteSubmitting = false;
+                    }
+                }
+
+                clickableCards.forEach((card) => {
+                    card.addEventListener('click', () => openVoteDialog(card.dataset.playerId || '', card.dataset.playerName || 'ce joueur'));
+                    card.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openVoteDialog(card.dataset.playerId || '', card.dataset.playerName || 'ce joueur');
+                        }
+                    });
                 });
             }
         }
