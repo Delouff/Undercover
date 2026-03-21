@@ -1281,15 +1281,20 @@
         .online-clue-player-label--animate {
             animation: cluePlayerLabelReveal 360ms ease-out 320ms both;
         }
+        .online-clue-player-label--self {
+            color: #ffd88d;
+        }
         .online-clue-card {
             position: relative;
-            min-height: 168px;
+            height: 172px;
+            min-height: 172px;
             perspective: 1400px;
         }
         .online-clue-card-inner {
             position: relative;
             width: 100%;
-            min-height: 168px;
+            height: 172px;
+            min-height: 172px;
             transform-style: preserve-3d;
             transition: transform 760ms cubic-bezier(0.22, 0.61, 0.36, 1);
         }
@@ -1364,10 +1369,12 @@
             z-index: 1;
             margin: 0;
             font-size: clamp(1.2rem, 2vw, 1.7rem);
-            line-height: 1.2;
+            line-height: 1.08;
             text-align: center;
             font-weight: bold;
-            word-break: break-word;
+            white-space: nowrap;
+            word-break: normal;
+            overflow-wrap: normal;
             color: #fff4de;
         }
         .online-clue-card-footnote {
@@ -1393,6 +1400,25 @@
         }
         .online-clue-card--self .online-clue-card-name {
             color: #fff1c9;
+        }
+        .online-clue-card--self .online-clue-card-face--back {
+            background:
+                radial-gradient(circle at top right, rgba(120, 190, 255, 0.22), transparent 40%),
+                linear-gradient(160deg, rgba(32, 52, 78, 0.98), rgba(22, 32, 50, 0.98));
+            border-color: rgba(152, 202, 255, 0.34);
+        }
+        .online-clue-card--self .online-clue-card-face--front {
+            background:
+                radial-gradient(circle at top right, rgba(145, 204, 255, 0.3), transparent 40%),
+                linear-gradient(160deg, rgba(46, 73, 110, 0.98), rgba(22, 34, 56, 0.98));
+            border-color: rgba(168, 212, 255, 0.4);
+        }
+        .online-clue-card--self .online-clue-card-kicker,
+        .online-clue-card--self .online-clue-card-footnote {
+            color: rgba(225, 240, 255, 0.82);
+        }
+        .online-clue-card--self .online-clue-card-word {
+            color: #eef7ff;
         }
         .online-clue-card--eliminated {
             opacity: 0.7;
@@ -1883,6 +1909,9 @@
             revealedClueKeys: new Set(),
             lastClueRound: null,
             discussionVoteSubmitting: false,
+            discussionVoteDialogTargetId: null,
+            discussionVoteDialogTargetName: '',
+            discussionVoteDialogSelectedRole: '',
             discussionChatDraft: '',
             discussionChatShouldRefocus: false,
             discussionChatSelectionStart: null,
@@ -2339,11 +2368,18 @@
             onlineSessionRuntime.lastRevision = null;
             onlineSessionRuntime.lastStatus = null;
             onlineSessionRuntime.discussionVoteSubmitting = false;
+            clearDiscussionVoteDialogState();
             onlineSessionRuntime.discussionChatDraft = '';
             onlineSessionRuntime.discussionChatShouldRefocus = false;
             onlineSessionRuntime.discussionChatSelectionStart = null;
             onlineSessionRuntime.discussionChatSelectionEnd = null;
             window.localStorage.removeItem(ONLINE_AUTH_STORAGE_KEY);
+        }
+
+        function clearDiscussionVoteDialogState() {
+            onlineSessionRuntime.discussionVoteDialogTargetId = null;
+            onlineSessionRuntime.discussionVoteDialogTargetName = '';
+            onlineSessionRuntime.discussionVoteDialogSelectedRole = '';
         }
 
         function savePendingInfoMessage(message) {
@@ -3696,6 +3732,30 @@
             return 'Civil';
         }
 
+        function getOnlineClueWordStyle(text) {
+            const normalized = String(text || '').trim();
+            const compactLength = normalized.replace(/\s+/g, '').length;
+            let fontSize = 1.7;
+            let letterSpacing = 0;
+
+            if (compactLength >= 9) fontSize = 1.5;
+            if (compactLength >= 11) fontSize = 1.34;
+            if (compactLength >= 13) fontSize = 1.18;
+            if (compactLength >= 15) fontSize = 1.04;
+            if (compactLength >= 17) fontSize = 0.92;
+            if (compactLength >= 19) fontSize = 0.84;
+            if (compactLength >= 21) {
+                fontSize = 0.76;
+                letterSpacing = -0.01;
+            }
+            if (compactLength >= 23) {
+                fontSize = 0.68;
+                letterSpacing = -0.018;
+            }
+
+            return `font-size:${fontSize}rem;letter-spacing:${letterSpacing}rem;`;
+        }
+
         function renderOnlineRoundSummary(summary) {
             if (!summary) return '';
 
@@ -3714,6 +3774,7 @@
 
         function renderOnlineSessionState(view) {
             if (view.status !== 'discussion') {
+                clearDiscussionVoteDialogState();
                 onlineSessionRuntime.discussionChatDraft = '';
                 onlineSessionRuntime.discussionChatShouldRefocus = false;
             }
@@ -4040,6 +4101,7 @@
                 }
                 if (isSelf) {
                     cardClasses.push('online-clue-card--self');
+                    labelClasses.push('online-clue-player-label--self');
                 }
 
                 if (isEliminated) {
@@ -4075,7 +4137,7 @@
                                 </article>
                                 <article class="online-clue-card-face online-clue-card-face--front">
                                     <div class="online-clue-card-kicker">${frontKicker}</div>
-                                    <p class="online-clue-card-word">${submittedClue ? escapeHtml(submittedClue.text) : '&nbsp;'}</p>
+                                    <p class="online-clue-card-word" style="${getOnlineClueWordStyle(submittedClue ? submittedClue.text : '')}">${submittedClue ? escapeHtml(submittedClue.text) : '&nbsp;'}</p>
                                     <p class="online-clue-card-footnote">${escapeHtml(String(frontFootnote).replace(/\u00c2\u00b7/g, ' - '))}</p>
                                 </article>
                             </div>
@@ -4228,10 +4290,13 @@
                     if (isVotedTarget) {
                         cardClasses.push('online-discussion-clue-card--selected');
                     }
+                    if (isSelfCard) {
+                        cardClasses.push('online-clue-card--self');
+                    }
 
                     return `
                         <div class="online-clue-card-slot">
-                            <p class="online-clue-player-label online-clue-player-label--visible">${escapeHtml(label)}</p>
+                            <p class="online-clue-player-label online-clue-player-label--visible ${isSelfCard ? 'online-clue-player-label--self' : ''}">${escapeHtml(label)}</p>
                             <div class="${cardClasses.join(' ')}" ${isClickable ? `data-player-id="${escapeHtml(entry.playerId)}" data-player-name="${escapeHtml(entry.playerName)}" tabindex="0" role="button"` : ''}>
                                 <div class="online-clue-card-inner">
                                     <div class="online-clue-card-face online-clue-card-face--back">
@@ -4241,7 +4306,7 @@
                                     </div>
                                     <div class="online-clue-card-face online-clue-card-face--front">
                                         <div class="online-clue-card-kicker">Mot du tour</div>
-                                        <p class="online-clue-card-word">${escapeHtml(entry.text)}</p>
+                                        <p class="online-clue-card-word" style="${getOnlineClueWordStyle(entry.text)}">${escapeHtml(entry.text)}</p>
                                         <p class="online-clue-card-footnote">${escapeHtml(footnote)}</p>
                                     </div>
                                 </div>
@@ -4487,80 +4552,118 @@
             }
 
             const clickableCards = document.querySelectorAll('.online-discussion-clue-card--selectable[data-player-id]');
-            if (clickableCards.length && voteError) {
-                function openVoteDialog(targetPlayerId, targetPlayerName) {
-                    const optionsHtml = view.guessRoleOptions.map((role, index) => `
-                        <label class="dialog-choice-option">
-                            <input type="radio" name="discussionVoteRoleChoice" value="${escapeHtml(role.id)}" ${index === 0 ? 'checked' : ''}>
-                            <span>${escapeHtml(role.label)}</span>
-                        </label>
-                    `).join('');
 
-                    const overlay = createDialog(`
-                        <div class="dialog-kicker">Vote</div>
-                        <h3>Eliminer ${escapeHtml(targetPlayerName)} ?</h3>
-                        <p>Choisis le role que tu attribues a ce joueur avant de valider ton vote.</p>
-                        <div class="dialog-choice-list">
-                            ${optionsHtml}
-                        </div>
-                        <div id="discussionVoteDialogError" class="dialog-error" style="display:none;"></div>
-                        <div class="dialog-actions">
-                            <button id="discussionVoteDialogConfirmBtn" type="button">Valider le vote</button>
-                            <button id="discussionVoteDialogCancelBtn" type="button" class="button-secondary">Annuler</button>
-                        </div>
-                    `);
+            function openVoteDialog(targetPlayerId, targetPlayerName) {
+                if (!voteError) return;
 
-                    const errorBox = document.getElementById('discussionVoteDialogError');
-                    const confirmBtn = document.getElementById('discussionVoteDialogConfirmBtn');
-                    const cancelBtn = document.getElementById('discussionVoteDialogCancelBtn');
-
-                    cancelBtn.addEventListener('click', function() {
-                        closeDialog(overlay);
-                    });
-
-                    confirmBtn.addEventListener('click', async function() {
-                        const role = document.querySelector('input[name="discussionVoteRoleChoice"]:checked')?.value || '';
-                        if (!role) {
-                            errorBox.textContent = 'Choisis un role avant de valider.';
-                            errorBox.style.display = 'block';
-                            return;
-                        }
-
-                        await submitCardVote(targetPlayerId, role, overlay);
-                    });
+                const targetPlayer = playerInfoById.get(targetPlayerId);
+                if (!view.canVote || !targetPlayer?.alive || targetPlayerId === view.self.id || !view.guessRoleOptions.length) {
+                    clearDiscussionVoteDialogState();
+                    return;
                 }
 
-                async function submitCardVote(targetPlayerId, role, overlay = null) {
-                    if (onlineSessionRuntime.discussionVoteSubmitting) return;
-                    onlineSessionRuntime.discussionVoteSubmitting = true;
-                    voteError.style.display = 'none';
+                const existingOverlay = document.querySelector('.dialog-overlay[data-dialog-id="discussion-vote"]');
+                if (existingOverlay) {
+                    closeDialog(existingOverlay);
+                }
 
-                    try {
-                        await performOnlineAction('/api/session/vote', {
-                            type: 'accuse',
-                            targetPlayerId,
-                            guessedRole: role
-                        });
-                        if (overlay) {
-                            closeDialog(overlay);
+                const savedRole = onlineSessionRuntime.discussionVoteDialogTargetId === targetPlayerId
+                    ? onlineSessionRuntime.discussionVoteDialogSelectedRole
+                    : '';
+                const initialRole = view.guessRoleOptions.some((role) => role.id === savedRole)
+                    ? savedRole
+                    : (view.guessRoleOptions[0]?.id || '');
+
+                onlineSessionRuntime.discussionVoteDialogTargetId = targetPlayerId;
+                onlineSessionRuntime.discussionVoteDialogTargetName = targetPlayerName;
+                onlineSessionRuntime.discussionVoteDialogSelectedRole = initialRole;
+
+                const optionsHtml = view.guessRoleOptions.map((role) => `
+                    <label class="dialog-choice-option">
+                        <input type="radio" name="discussionVoteRoleChoice" value="${escapeHtml(role.id)}" ${role.id === initialRole ? 'checked' : ''}>
+                        <span>${escapeHtml(role.label)}</span>
+                    </label>
+                `).join('');
+
+                const overlay = createDialog(`
+                    <div class="dialog-kicker">Vote</div>
+                    <h3>Eliminer ${escapeHtml(targetPlayerName)} ?</h3>
+                    <p>Choisis le role que tu attribues a ce joueur avant de valider ton vote.</p>
+                    <div class="dialog-choice-list">
+                        ${optionsHtml}
+                    </div>
+                    <div id="discussionVoteDialogError" class="dialog-error" style="display:none;"></div>
+                    <div class="dialog-actions">
+                        <button id="discussionVoteDialogConfirmBtn" type="button">Valider le vote</button>
+                        <button id="discussionVoteDialogCancelBtn" type="button" class="button-secondary">Annuler</button>
+                    </div>
+                `);
+                overlay.dataset.dialogId = 'discussion-vote';
+
+                const errorBox = document.getElementById('discussionVoteDialogError');
+                const confirmBtn = document.getElementById('discussionVoteDialogConfirmBtn');
+                const cancelBtn = document.getElementById('discussionVoteDialogCancelBtn');
+                const roleInputs = overlay.querySelectorAll('input[name="discussionVoteRoleChoice"]');
+
+                roleInputs.forEach((input) => {
+                    input.addEventListener('change', function() {
+                        if (input.checked) {
+                            onlineSessionRuntime.discussionVoteDialogSelectedRole = input.value || '';
                         }
-                        await refreshOnlineSession(true);
-                    } catch (error) {
-                        if (overlay) {
-                            const errorBox = document.getElementById('discussionVoteDialogError');
-                            if (errorBox) {
-                                errorBox.textContent = error.message;
-                                errorBox.style.display = 'block';
-                            }
-                        } else {
-                            voteError.textContent = error.message;
-                            voteError.style.display = 'block';
-                        }
-                    } finally {
-                        onlineSessionRuntime.discussionVoteSubmitting = false;
+                    });
+                });
+
+                cancelBtn.addEventListener('click', function() {
+                    clearDiscussionVoteDialogState();
+                    closeDialog(overlay);
+                });
+
+                confirmBtn.addEventListener('click', async function() {
+                    const role = overlay.querySelector('input[name="discussionVoteRoleChoice"]:checked')?.value || '';
+                    if (!role) {
+                        errorBox.textContent = 'Choisis un role avant de valider.';
+                        errorBox.style.display = 'block';
+                        return;
                     }
-                }
 
+                    onlineSessionRuntime.discussionVoteDialogSelectedRole = role;
+                    await submitCardVote(targetPlayerId, role, overlay);
+                });
+            }
+
+            async function submitCardVote(targetPlayerId, role, overlay = null) {
+                if (!voteError || onlineSessionRuntime.discussionVoteSubmitting) return;
+                onlineSessionRuntime.discussionVoteSubmitting = true;
+                voteError.style.display = 'none';
+
+                try {
+                    await performOnlineAction('/api/session/vote', {
+                        type: 'accuse',
+                        targetPlayerId,
+                        guessedRole: role
+                    });
+                    clearDiscussionVoteDialogState();
+                    if (overlay) {
+                        closeDialog(overlay);
+                    }
+                    await refreshOnlineSession(true);
+                } catch (error) {
+                    if (overlay) {
+                        const errorBox = document.getElementById('discussionVoteDialogError');
+                        if (errorBox) {
+                            errorBox.textContent = error.message;
+                            errorBox.style.display = 'block';
+                        }
+                    } else {
+                        voteError.textContent = error.message;
+                        voteError.style.display = 'block';
+                    }
+                } finally {
+                    onlineSessionRuntime.discussionVoteSubmitting = false;
+                }
+            }
+
+            if (clickableCards.length && voteError) {
                 clickableCards.forEach((card) => {
                     card.addEventListener('click', () => openVoteDialog(card.dataset.playerId || '', card.dataset.playerName || 'ce joueur'));
                     card.addEventListener('keydown', (event) => {
@@ -4570,6 +4673,28 @@
                         }
                     });
                 });
+            }
+
+            const savedVoteTargetId = onlineSessionRuntime.discussionVoteDialogTargetId;
+            const savedVoteEntry = savedVoteTargetId
+                ? view.clues.find((entry) => entry.playerId === savedVoteTargetId)
+                : null;
+            const savedVotePlayer = savedVoteEntry ? playerInfoById.get(savedVoteEntry.playerId) : null;
+            const canRestoreVoteDialog = Boolean(
+                savedVoteEntry
+                && savedVotePlayer?.alive
+                && view.canVote
+                && view.guessRoleOptions.length
+                && savedVoteEntry.playerId !== view.self.id
+            );
+
+            if (canRestoreVoteDialog) {
+                openVoteDialog(
+                    savedVoteEntry.playerId,
+                    onlineSessionRuntime.discussionVoteDialogTargetName || savedVoteEntry.playerName
+                );
+            } else if (savedVoteTargetId) {
+                clearDiscussionVoteDialogState();
             }
         }
 

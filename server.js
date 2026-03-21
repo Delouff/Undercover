@@ -166,6 +166,9 @@ function removePlayerFromSession(session, playerId) {
     }
 
     session.alivePlayerIds = (session.alivePlayerIds || []).filter((entryId) => entryId !== playerId);
+    if (Array.isArray(session.turnOrderPlayerIds)) {
+        session.turnOrderPlayerIds = session.turnOrderPlayerIds.filter((entryId) => entryId !== playerId);
+    }
 
     if (session.secretAcknowledged) {
         session.secretAcknowledged.delete(playerId);
@@ -240,9 +243,25 @@ function ensurePlayer(session, playerId) {
     return session.players.find((entry) => entry.id === playerId);
 }
 
+function getTurnOrderedPlayers(session) {
+    const turnOrder = Array.isArray(session.turnOrderPlayerIds) ? session.turnOrderPlayerIds : [];
+    if (!turnOrder.length) {
+        return [...session.players];
+    }
+
+    const playersById = new Map(session.players.map((entry) => [entry.id, entry]));
+    const orderedPlayers = turnOrder
+        .map((playerId) => playersById.get(playerId))
+        .filter(Boolean);
+    const orderedIds = new Set(orderedPlayers.map((entry) => entry.id));
+    const remainingPlayers = session.players.filter((entry) => !orderedIds.has(entry.id));
+
+    return [...orderedPlayers, ...remainingPlayers];
+}
+
 function getAlivePlayers(session) {
     const aliveIds = new Set(session.alivePlayerIds || []);
-    return session.players.filter((entry) => aliveIds.has(entry.id));
+    return getTurnOrderedPlayers(session).filter((entry) => aliveIds.has(entry.id));
 }
 
 function isPlayerAlive(session, playerId) {
@@ -253,7 +272,15 @@ function getConfiguredGuessRoles(session) {
     const roles = [];
     if (session.settings.mrWhite) roles.push('mrwhite');
     if (session.settings.undercover) roles.push('undercover');
-    return roles;
+
+    if (!session.assignments) {
+        return roles;
+    }
+
+    const aliveIds = new Set(session.alivePlayerIds || []);
+    return roles.filter((role) => session.players.some((player) => (
+        aliveIds.has(player.id) && session.assignments[player.id]?.role === role
+    )));
 }
 
 function getActiveCluePlayer(session) {
@@ -374,6 +401,7 @@ function returnSessionToWaiting(session) {
     session.status = 'waiting';
     session.assignments = null;
     session.alivePlayerIds = session.players.map((entry) => entry.id);
+    session.turnOrderPlayerIds = null;
     session.secretAcknowledged = new Set();
     session.clues = [];
     session.activeClueIndex = 0;
@@ -444,6 +472,10 @@ function buildSessionView(session, playerId) {
     const configuredGuessRoles = getConfiguredGuessRoles(session);
     const playerVote = session.votes ? session.votes[playerId] : null;
 
+    const orderedPlayers = session.status === 'waiting'
+        ? session.players
+        : getTurnOrderedPlayers(session);
+
     return {
         code: session.code,
         revision: session.revision,
@@ -462,7 +494,7 @@ function buildSessionView(session, playerId) {
         canStart: session.status === 'waiting'
             && session.hostPlayerId === playerId
             && session.players.length === session.settings.players,
-        players: session.players.map((entry) => ({
+        players: orderedPlayers.map((entry) => ({
             id: entry.id,
             name: entry.name,
             isHost: entry.id === session.hostPlayerId,
@@ -595,6 +627,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             roundNumber: 1,
             discussionMessages: [],
             votes: {},
+            turnOrderPlayerIds: null,
             lastRoundSummary: null,
             winner: null,
             createdAt: Date.now(),
@@ -820,6 +853,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
 
         buildAssignments(session);
         session.alivePlayerIds = session.players.map((entry) => entry.id);
+        session.turnOrderPlayerIds = shuffle(session.players.map((entry) => entry.id));
         session.secretAcknowledged = new Set();
         session.clues = [];
         session.activeClueIndex = 0;
