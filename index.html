@@ -4229,7 +4229,7 @@
                                         <div class="online-clue-card-kicker">Mot du tour</div>
                                         <p class="online-clue-card-word">${escapeHtml(entry.text)}</p>
                                         <p class="online-clue-card-footnote">${escapeHtml(footnote)}</p>
-                                        ${isClickable ? '<div class="online-discussion-clue-hover">Eliminer ce joueur</div>' : ''}
+                                        ${isClickable ? `<div class="online-discussion-clue-hover"><span>Voter pour ${escapeHtml(entry.playerName)}</span></div>` : ''}
                                     </div>
                                 </div>
                             </div>
