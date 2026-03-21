@@ -1884,7 +1884,9 @@
             lastClueRound: null,
             discussionVoteSubmitting: false,
             discussionChatDraft: '',
-            discussionChatShouldRefocus: false
+            discussionChatShouldRefocus: false,
+            discussionChatSelectionStart: null,
+            discussionChatSelectionEnd: null
         };
         const ONLINE_AUTH_STORAGE_KEY = 'undercover_online_auth';
         const PUBLIC_SHARE_URL_STORAGE_KEY = 'undercover_public_share_url';
@@ -2339,6 +2341,8 @@
             onlineSessionRuntime.discussionVoteSubmitting = false;
             onlineSessionRuntime.discussionChatDraft = '';
             onlineSessionRuntime.discussionChatShouldRefocus = false;
+            onlineSessionRuntime.discussionChatSelectionStart = null;
+            onlineSessionRuntime.discussionChatSelectionEnd = null;
             window.localStorage.removeItem(ONLINE_AUTH_STORAGE_KEY);
         }
 
@@ -2435,6 +2439,12 @@
                 if (currentChatInput) {
                     onlineSessionRuntime.discussionChatDraft = currentChatInput.value || '';
                     onlineSessionRuntime.discussionChatShouldRefocus = document.activeElement === currentChatInput;
+                    onlineSessionRuntime.discussionChatSelectionStart = typeof currentChatInput.selectionStart === 'number'
+                        ? currentChatInput.selectionStart
+                        : null;
+                    onlineSessionRuntime.discussionChatSelectionEnd = typeof currentChatInput.selectionEnd === 'number'
+                        ? currentChatInput.selectionEnd
+                        : null;
                 }
 
                 const auth = onlineSessionRuntime.auth;
@@ -4384,8 +4394,14 @@
                     window.requestAnimationFrame(() => {
                         chatInput.focus();
                         const draftLength = chatInput.value.length;
+                        const selectionStart = typeof onlineSessionRuntime.discussionChatSelectionStart === 'number'
+                            ? Math.min(onlineSessionRuntime.discussionChatSelectionStart, draftLength)
+                            : draftLength;
+                        const selectionEnd = typeof onlineSessionRuntime.discussionChatSelectionEnd === 'number'
+                            ? Math.min(onlineSessionRuntime.discussionChatSelectionEnd, draftLength)
+                            : selectionStart;
                         try {
-                            chatInput.setSelectionRange(draftLength, draftLength);
+                            chatInput.setSelectionRange(selectionStart, selectionEnd);
                         } catch (error) {
                             console.error(error);
                         }
@@ -4394,12 +4410,19 @@
 
                 chatInput.addEventListener('focus', function() {
                     onlineSessionRuntime.discussionChatShouldRefocus = true;
+                    onlineSessionRuntime.discussionChatSelectionStart = typeof chatInput.selectionStart === 'number'
+                        ? chatInput.selectionStart
+                        : null;
+                    onlineSessionRuntime.discussionChatSelectionEnd = typeof chatInput.selectionEnd === 'number'
+                        ? chatInput.selectionEnd
+                        : null;
                 });
-                chatInput.addEventListener('blur', function() {
-                    onlineSessionRuntime.discussionChatShouldRefocus = false;
-                });
+                chatInput.addEventListener('click', syncChatSelectionState);
+                chatInput.addEventListener('keyup', syncChatSelectionState);
+                chatInput.addEventListener('select', syncChatSelectionState);
                 chatInput.addEventListener('input', function() {
                     onlineSessionRuntime.discussionChatDraft = chatInput.value.substring(0, 100);
+                    syncChatSelectionState();
                     updateChatCounter();
                 });
                 chatInput.addEventListener('keydown', function(event) {
@@ -4409,6 +4432,15 @@
                     }
                 });
                 chatButton.addEventListener('click', sendChatMessage);
+
+                function syncChatSelectionState() {
+                    onlineSessionRuntime.discussionChatSelectionStart = typeof chatInput.selectionStart === 'number'
+                        ? chatInput.selectionStart
+                        : null;
+                    onlineSessionRuntime.discussionChatSelectionEnd = typeof chatInput.selectionEnd === 'number'
+                        ? chatInput.selectionEnd
+                        : null;
+                }
 
                 async function sendChatMessage() {
                     const text = chatInput.value.trim().substring(0, 100);
@@ -4422,6 +4454,8 @@
                     try {
                         await performOnlineAction('/api/session/chat', { text });
                         onlineSessionRuntime.discussionChatDraft = '';
+                        onlineSessionRuntime.discussionChatSelectionStart = null;
+                        onlineSessionRuntime.discussionChatSelectionEnd = null;
                         chatInput.value = '';
                         updateChatCounter();
                         chatError.style.display = 'none';
