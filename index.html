@@ -13,6 +13,7 @@
             --desktop-shell-height: calc(100svh - 172px);
             --desktop-home-height: calc(100svh - 60px);
             --desktop-shell-gap: clamp(20px, 2.4vw, 30px);
+            --desktop-three-panel-columns: minmax(240px, 1fr) minmax(480px, 2fr) minmax(240px, 1fr);
         }
         body {
             display: flex;
@@ -398,13 +399,13 @@
         .home-shell {
             position: relative;
             z-index: 2;
-            width: min(1300px, calc(100vw - 88px));
+            width: min(1320px, calc(100vw - 88px));
             min-height: var(--desktop-home-height);
             max-height: var(--desktop-home-height);
             margin: 0 auto;
             display: grid;
-            grid-template-columns: minmax(180px, 210px) minmax(0, 660px) minmax(180px, 210px);
-            gap: clamp(46px, 5.8vw, 92px);
+            grid-template-columns: var(--desktop-three-panel-columns);
+            gap: clamp(42px, 4.8vw, 74px);
             justify-items: stretch;
             align-items: center;
             align-content: center;
@@ -959,7 +960,7 @@
             height: var(--desktop-shell-height);
             padding: 0 20px;
             display: grid;
-            grid-template-columns: minmax(235px, 285px) minmax(360px, 1fr) minmax(300px, 360px);
+            grid-template-columns: var(--desktop-three-panel-columns);
             gap: var(--desktop-shell-gap);
             align-items: center;
             margin: 0 auto;
