@@ -757,6 +757,12 @@
             text-align: left;
             overflow: hidden;
         }
+        .waiting-role-card--lobby {
+            width: min(100%, 420px);
+            padding: 14px 16px;
+            border-radius: 16px;
+            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
+        }
         .waiting-role-card--host {
             background: linear-gradient(135deg, rgba(255, 176, 51, 0.28), rgba(66, 48, 20, 0.92));
             border: 1px solid rgba(255, 210, 133, 0.35);
@@ -796,6 +802,20 @@
         }
         .waiting-role-text strong {
             color: #fff;
+        }
+        .waiting-role-card--lobby .waiting-role-badge {
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            font-size: 0.76rem;
+        }
+        .waiting-role-card--lobby .waiting-role-title {
+            margin-bottom: 6px;
+            font-size: 1.08rem;
+            line-height: 1.22;
+        }
+        .waiting-role-card--lobby .waiting-role-text {
+            font-size: 0.93rem;
+            line-height: 1.45;
         }
         .waiting-panel {
             padding: 18px;
@@ -1877,7 +1897,7 @@
                 : '';
 
             return `
-                <div class="waiting-role-card ${isHost ? 'waiting-role-card--host' : 'waiting-role-card--guest'}">
+                <div class="waiting-role-card waiting-role-card--lobby ${isHost ? 'waiting-role-card--host' : 'waiting-role-card--guest'}">
                     <div class="waiting-role-badge">${badge}</div>
                     <div class="waiting-role-title">${title}</div>
                     <p class="waiting-role-text">${text}</p>
