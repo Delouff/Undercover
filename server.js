@@ -488,9 +488,32 @@ function startMrWhiteGuessPhase(session, options = {}) {
 
 function determineWinner(session) {
     const alivePlayers = getAlivePlayers(session);
+    const aliveCount = alivePlayers.length;
     const civilsAlive = alivePlayers.filter((player) => session.assignments[player.id]?.role === 'civil').length;
     const undercoverAlive = alivePlayers.some((player) => session.assignments[player.id]?.role === 'undercover');
     const mrWhiteAlive = alivePlayers.some((player) => session.assignments[player.id]?.role === 'mrwhite');
+
+    if (aliveCount <= 2 && (undercoverAlive || mrWhiteAlive)) {
+        if (undercoverAlive && mrWhiteAlive) {
+            return {
+                team: 'special',
+                title: 'Victoire de MrWhite et de l Undercover !',
+                message: 'Il ne reste plus que deux joueurs. Les roles speciaux gagnent ensemble.'
+            };
+        }
+        if (undercoverAlive) {
+            return {
+                team: 'undercover',
+                title: 'Victoire de l Undercover !',
+                message: 'Il ne reste plus que deux joueurs. L Undercover remporte la partie.'
+            };
+        }
+        return {
+            team: 'mrwhite',
+            title: 'Victoire de MrWhite !',
+            message: 'Il ne reste plus que deux joueurs. MrWhite remporte la partie.'
+        };
+    }
 
     if (civilsAlive === 0 && (undercoverAlive || mrWhiteAlive)) {
         if (undercoverAlive && mrWhiteAlive) {

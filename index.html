@@ -1340,6 +1340,9 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .online-clue-card-history--front {
+            color: rgba(255, 232, 198, 0.6);
+        }
         .online-clue-card--self .online-clue-card-history {
             color: rgba(196, 221, 255, 0.64);
         }
@@ -3875,11 +3878,25 @@
                 });
 
                 function checkEndGame(joueurs) {
+                    const alivePlayers = joueurs.filter(j => !j.eliminer);
+                    const aliveCount = alivePlayers.length;
                     const civilsAlive = joueurs.filter(j => j.role === "civil" && !j.eliminer).length;
                     const undercoverAlive = joueurs.some(j => j.role === "undercover" && !j.eliminer);
                     const mrWhiteAlive = joueurs.some(j => j.role === "mrwhite" && !j.eliminer);
 
-                    if (civilsAlive === 0 && (undercoverAlive || mrWhiteAlive)) {
+                    if (aliveCount <= 2 && (undercoverAlive || mrWhiteAlive)) {
+                        let message = "";
+                        if (undercoverAlive && mrWhiteAlive) {
+                            message = `<b>Victoire de MrWhite et de l'Undercover !</b><br><span style="font-size:1.1rem;">Il ne reste plus que deux joueurs, les rôles spéciaux gagnent ensemble !</span>`;
+                        } else if (undercoverAlive) {
+                            message = `<b>Victoire de l'Undercover !</b><br><span style="font-size:1.1rem;">Il ne reste plus que deux joueurs, l'Undercover remporte la partie !</span>`;
+                        } else if (mrWhiteAlive) {
+                            message = `<b>Victoire de MrWhite !</b><br><span style="font-size:1.1rem;">Il ne reste plus que deux joueurs, MrWhite remporte la partie !</span>`;
+                        }
+                        showEndGamePopup(message, "#d32f2f");
+                        return true;
+                    }
+                    else if (civilsAlive === 0 && (undercoverAlive || mrWhiteAlive)) {
                         let message = "";
                         if (undercoverAlive && mrWhiteAlive) {
                             message = `<b>Victoire de MrWhite et de l'Undercover !</b><br><span style="font-size:1.1rem;">Les rôles spéciaux ont gagné ensemble !</span>`;
@@ -4680,6 +4697,7 @@
                                 </article>
                                 <article class="online-clue-card-face online-clue-card-face--front">
                                     <div class="online-clue-card-kicker">${frontKicker}</div>
+                                    <p class="online-clue-card-history online-clue-card-history--front">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                                     <p class="online-clue-card-word" style="${getOnlineClueWordStyle(submittedClue ? submittedClue.text : '')}">${submittedClue ? escapeHtml(submittedClue.text) : '&nbsp;'}</p>
                                     <p class="online-clue-card-footnote">${escapeHtml(String(frontFootnote).replace(/\u00c2\u00b7/g, ' - '))}</p>
                                 </article>
@@ -4863,10 +4881,12 @@
                                     <div class="online-clue-card-face online-clue-card-face--back">
                                         <div class="online-clue-card-kicker">Carte du joueur</div>
                                         <p class="online-clue-card-name">${escapeHtml(entry.playerName)}</p>
+                                        <p class="online-clue-card-history">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                                         <p class="online-clue-card-status">Le mot a deja ete revele.</p>
                                     </div>
                                     <div class="online-clue-card-face online-clue-card-face--front">
                                         <div class="online-clue-card-kicker">Mot du tour</div>
+                                        <p class="online-clue-card-history online-clue-card-history--front">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                                         <p class="online-clue-card-word" style="${getOnlineClueWordStyle(entry.text)}">${escapeHtml(entry.text)}</p>
                                         <p class="online-clue-card-footnote">${escapeHtml(footnote)}</p>
                                     </div>
