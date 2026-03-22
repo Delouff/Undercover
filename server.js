@@ -21,13 +21,7 @@ const MIME_TYPES = {
     '.txt': 'text/plain; charset=utf-8'
 };
 
-const motsFrancais = [
-    'chat', 'chien', 'maison', 'voiture', 'pain', 'eau', 'livre', 'arbre', 'soleil', 'lune',
-    'porte', 'table', 'fleur', 'route', 'montagne', 'mer', 'pomme', 'banane', 'fromage', 'cle',
-    'fenetre', 'chaise', 'camion', 'bus', 'train', 'avion', 'plage', 'foret', 'rue', 'ville',
-    'ordinateur', 'musique', 'film', 'photo', 'journal', 'stylo', 'papier', 'crayon', 'bouteille', 'verre',
-    'telephone', 'lampe', 'couteau', 'fourchette', 'cuillere', 'assiette', 'serviette', 'chaussure', 'veste', 'pantalon'
-];
+const motPairs = require('./word-pairs.js');
 
 const sessions = new Map();
 const closedSessions = new Map();
@@ -180,14 +174,12 @@ function updateSessionRevision(session) {
 }
 
 function pickDistinctWords() {
-    const motCivil = motsFrancais[Math.floor(Math.random() * motsFrancais.length)];
-    let motUndercover = motCivil;
-
-    while (motUndercover === motCivil) {
-        motUndercover = motsFrancais[Math.floor(Math.random() * motsFrancais.length)];
+    const pair = motPairs[Math.floor(Math.random() * motPairs.length)] || ['chat', 'chien'];
+    if (Math.random() < 0.5) {
+        return { motCivil: pair[0], motUndercover: pair[1] };
     }
 
-    return { motCivil, motUndercover };
+    return { motCivil: pair[1], motUndercover: pair[0] };
 }
 
 function buildAssignments(session) {

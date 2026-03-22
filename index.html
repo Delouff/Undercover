@@ -1538,6 +1538,18 @@
             margin: 0 auto;
             z-index: 2;
         }
+        .local-screen-actions {
+            width: min(1260px, calc(100vw - 88px));
+            margin: 0 auto 16px;
+            padding: 0 20px;
+            position: relative;
+            z-index: 2;
+            box-sizing: border-box;
+        }
+        .local-screen-actions--distribution {
+            width: min(1040px, calc(100vw - 88px));
+            margin-bottom: 8px;
+        }
         #cardsContainer {
             width: min(960px, 100%);
             max-height: calc(100svh - 320px);
@@ -1787,6 +1799,7 @@
                 grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             }
             .single-screen-stack,
+            .local-screen-actions,
             .local-distribution-shell,
             .local-game-layout {
                 width: calc(100% - 32px);
@@ -1893,6 +1906,7 @@
             .online-discussion-layout,
             .online-clue-stage,
             .single-screen-stack,
+            .local-screen-actions,
             .local-distribution-shell,
             .local-game-layout,
             .waiting-layout {
@@ -1989,6 +2003,7 @@
             .online-discussion-layout,
             .online-clue-stage,
             .single-screen-stack,
+            .local-screen-actions,
             .local-distribution-shell,
             .local-game-layout {
                 width: calc(100% - 16px);
@@ -2152,6 +2167,7 @@
     </main>
 
 
+    <script src="word-pairs.js"></script>
     <script>
         // Gestion des boutons de session multijoueur
         document.addEventListener('DOMContentLoaded', function() {
@@ -2945,6 +2961,44 @@
             });
         }
 
+        function returnToLocalLobby() {
+            showLocalSetupScreen(localGameSettings || getDefaultSessionSettings());
+        }
+
+        function returnToHomeScreen() {
+            window.location.reload();
+        }
+
+        function bindLocalNavigationButtons(lobbyButtonId, homeButtonId, options = {}) {
+            const lobbyButton = document.getElementById(lobbyButtonId);
+            if (lobbyButton) {
+                lobbyButton.addEventListener('click', function() {
+                    showConfirmDialog(
+                        options.lobbyTitle || 'Retour au salon',
+                        options.lobbyMessage || 'Revenir au salon local et conserver les reglages actuels ?',
+                        'Retour au salon',
+                        function() {
+                            returnToLocalLobby();
+                        }
+                    );
+                });
+            }
+
+            const homeButton = document.getElementById(homeButtonId);
+            if (homeButton) {
+                homeButton.addEventListener('click', function() {
+                    showConfirmDialog(
+                        options.homeTitle || 'Retour a l accueil',
+                        options.homeMessage || 'Quitter la partie locale et revenir a l accueil ?',
+                        "Retour a l'accueil",
+                        function() {
+                            returnToHomeScreen();
+                        }
+                    );
+                });
+            }
+        }
+
         function showPublicShareUrlDialog() {
             const currentValue = loadPublicShareBaseUrl() || '';
             const currentOrigin = getCurrentShareBaseUrl();
@@ -3306,7 +3360,54 @@
                 "téléphone", "lampe", "couteau", "fourchette", "cuillère", "assiette", "serviette", "chaussure", "veste", "pantalon"
             ];
 
-            const motCivil = motsFrancais[Math.floor(Math.random() * motsFrancais.length)];
+            const motPairs = [
+                ["chat", "chien"],
+                ["lion", "tigre"],
+                ["requin", "dauphin"],
+                ["aigle", "faucon"],
+                ["serpent", "lezard"],
+                ["cheval", "zebre"],
+                ["mouton", "chevre"],
+                ["pomme", "poire"],
+                ["banane", "mangue"],
+                ["cerise", "fraise"],
+                ["carotte", "radis"],
+                ["tomate", "poivron"],
+                ["pain", "croissant"],
+                ["riz", "pates"],
+                ["cafe", "the"],
+                ["pizza", "burger"],
+                ["soleil", "lune"],
+                ["pluie", "neige"],
+                ["mer", "lac"],
+                ["montagne", "colline"],
+                ["foret", "jungle"],
+                ["riviere", "cascade"],
+                ["route", "autoroute"],
+                ["train", "metro"],
+                ["avion", "helicoptere"],
+                ["voiture", "moto"],
+                ["velo", "trottinette"],
+                ["stylo", "crayon"],
+                ["livre", "journal"],
+                ["lampe", "bougie"],
+                ["table", "chaise"],
+                ["porte", "fenetre"],
+                ["veste", "manteau"],
+                ["chemise", "pantalon"],
+                ["chaussette", "chaussure"],
+                ["guitare", "piano"],
+                ["film", "serie"],
+                ["photo", "video"],
+                ["ordinateur", "tablette"],
+                ["telephone", "radio"],
+                ["couteau", "fourchette"],
+                ["verre", "tasse"],
+                ["bouteille", "gourde"],
+                ["assiette", "bol"]
+            ];
+
+            let motCivil = motsFrancais[Math.floor(Math.random() * motsFrancais.length)];
             let motUndercover;
             let tries = 0;
             do {
@@ -3314,6 +3415,18 @@
                 tries++;
                 if (tries > 10) break;
             } while (motUndercover === motCivil);
+
+            const availableWordPairs = Array.isArray(window.WORD_PAIRS) && window.WORD_PAIRS.length
+                ? window.WORD_PAIRS
+                : motPairs;
+            const selectedPair = availableWordPairs[Math.floor(Math.random() * availableWordPairs.length)] || ["chat", "chien"];
+            if (Math.random() < 0.5) {
+                motCivil = selectedPair[0];
+                motUndercover = selectedPair[1];
+            } else {
+                motCivil = selectedPair[1];
+                motUndercover = selectedPair[0];
+            }
 
             let roles = [];
             let nbMrWhite = mrWhite ? 1 : 0;
@@ -3338,6 +3451,10 @@
                     </svg>
                 </div>
                 <h2>Distribution des cartes</h2>
+                <div class="waiting-action-row local-screen-actions local-screen-actions--distribution">
+                    <button id="returnLocalLobbyDistributionBtn" type="button" class="button-secondary">Retour au salon</button>
+                    <button id="returnLocalHomeDistributionBtn" type="button" class="button-secondary">Retour a l'accueil</button>
+                </div>
                 <div class="local-distribution-shell">
                     <div id="cardsContainer" style="display:flex;flex-wrap:wrap;justify-content:center;">
             `;
@@ -3351,6 +3468,10 @@
             cardsHtml += '</div></div>';
 
             document.body.innerHTML = cardsHtml;
+            bindLocalNavigationButtons('returnLocalLobbyDistributionBtn', 'returnLocalHomeDistributionBtn', {
+                lobbyMessage: 'Revenir au salon local avant le lancement de la partie ?',
+                homeMessage: 'Quitter la distribution des cartes et revenir a l accueil ?'
+            });
 
             document.querySelectorAll('.card').forEach(card => {
                 card.addEventListener('mouseover', () => card.style.transform = 'scale(1.05)');
@@ -3672,6 +3793,10 @@
                         </svg>
                     </div>
                     <h2>Partie en cours</h2>
+                    <div class="waiting-action-row local-screen-actions">
+                        <button id="returnLocalLobbyGameBtn" type="button" class="button-secondary">Retour au salon</button>
+                        <button id="returnLocalHomeGameBtn" type="button" class="button-secondary">Retour a l'accueil</button>
+                    </div>
                     <div class="local-game-layout">
                         <div class="local-game-panel">
                         <div style="font-size:1.25rem;font-weight:bold;margin-bottom:6px;">Tour des mots</div>
@@ -3708,6 +3833,10 @@
                 });
                 html += `</div></div>`;
                 document.body.innerHTML = html;
+                bindLocalNavigationButtons('returnLocalLobbyGameBtn', 'returnLocalHomeGameBtn', {
+                    lobbyMessage: 'Interrompre la partie locale et revenir au salon ?',
+                    homeMessage: 'Quitter la partie locale en cours et revenir a l accueil ?'
+                });
 
                 if (!allWordsDone && turnState.lastSubmittedIndex !== null && turnState.currentIndex !== null) {
                     turnState.pendingTimeout = window.setTimeout(() => {
@@ -4021,13 +4150,25 @@
                     endPopup.innerHTML = `
                         <div style="background:${color};color:#fff;padding:40px 30px;border-radius:16px;box-shadow:0 8px 32px #0007;text-align:center;min-width:220px;">
                             <div style="margin-bottom:30px;font-size:1.5rem;">${message}</div>
-                            <button id="closeEndPopup" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#222;color:#fff;cursor:pointer;">Nouvelle partie</button>
+                            <div class="waiting-action-row" style="justify-content:center;">
+                                <button id="closeEndPopup" type="button">Nouvelle partie</button>
+                                <button id="returnLocalLobbyEndBtn" type="button" class="button-secondary">Retour au salon</button>
+                                <button id="returnLocalHomeEndBtn" type="button" class="button-secondary">Retour a l'accueil</button>
+                            </div>
                         </div>
                     `;
                     document.body.appendChild(endPopup);
                     document.getElementById('closeEndPopup').addEventListener('click', function() {
                         document.body.removeChild(endPopup);
                         restartAfterGame();
+                    });
+                    document.getElementById('returnLocalLobbyEndBtn').addEventListener('click', function() {
+                        document.body.removeChild(endPopup);
+                        returnToLocalLobby();
+                    });
+                    document.getElementById('returnLocalHomeEndBtn').addEventListener('click', function() {
+                        document.body.removeChild(endPopup);
+                        returnToHomeScreen();
                     });
                 }
             }
