@@ -364,6 +364,69 @@
             animation: homeParticleFloat var(--duration) ease-in-out infinite;
             animation-delay: var(--delay);
         }
+        .home-background-chameleon {
+            position: absolute;
+            top: 47%;
+            right: 8%;
+            width: min(20vw, 248px);
+            max-width: 20vw;
+            transform: translateY(-50%);
+            transform-origin: center;
+            opacity: 0.86;
+            filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.26));
+            animation: homeChameleonFloat 7.8s ease-in-out infinite;
+            z-index: 1;
+        }
+        .home-background-chameleon svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            overflow: visible;
+        }
+        .home-bg-chameleon-branch {
+            fill: none;
+            stroke: rgba(109, 77, 58, 0.7);
+            stroke-width: 16;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .home-bg-chameleon-body {
+            fill: rgba(50, 103, 88, 0.8);
+            stroke: rgba(151, 229, 188, 0.42);
+            stroke-width: 3.4;
+        }
+        .home-bg-chameleon-shade {
+            fill: rgba(29, 58, 49, 0.46);
+        }
+        .home-bg-chameleon-limb,
+        .home-bg-chameleon-tail {
+            fill: none;
+            stroke: rgba(127, 206, 169, 0.5);
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .home-bg-chameleon-detail {
+            fill: none;
+            stroke: rgba(170, 237, 202, 0.34);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .home-bg-chameleon-eye {
+            fill: #f3ffd8;
+        }
+        .home-bg-chameleon-pupil {
+            fill: #0d120f;
+        }
+        .home-bg-chameleon-tongue {
+            fill: none;
+            stroke: rgba(213, 101, 91, 0.36);
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-dasharray: 6 8;
+            opacity: 0.68;
+        }
         .home-art {
             position: absolute;
             inset: 0;
@@ -681,6 +744,14 @@
             50% {
                 transform: scale(1.08);
                 opacity: 0.54;
+            }
+        }
+        @keyframes homeChameleonFloat {
+            0%, 100% {
+                transform: translateY(-50%) translateX(0) rotate(-1.3deg);
+            }
+            50% {
+                transform: translateY(calc(-50% - 12px)) translateX(-4px) rotate(1.1deg);
             }
         }
         @keyframes homeThreadPulse {
@@ -1628,6 +1699,13 @@
                 overflow: visible;
                 padding-right: 0;
             }
+            .home-background-chameleon {
+                top: 34%;
+                right: 4%;
+                width: min(26vw, 180px);
+                max-width: 26vw;
+                opacity: 0.56;
+            }
             .home-copy,
             .home-side-card {
                 padding: 26px 22px;
@@ -1742,6 +1820,13 @@
             }
             .home-title-row {
                 flex-direction: column;
+            }
+            .home-background-chameleon {
+                top: 30%;
+                right: 2%;
+                width: min(34vw, 128px);
+                max-width: 34vw;
+                opacity: 0.38;
             }
             .home-actions {
                 flex-direction: column;
@@ -1973,6 +2058,26 @@
                 </g>
             </g>
         </svg>
+        <div class="home-background-chameleon" aria-hidden="true">
+            <svg viewBox="0 0 320 260">
+                <path class="home-bg-chameleon-branch" d="M22 216 C92 196 184 196 294 224"></path>
+                <g transform="translate(146 118)">
+                    <ellipse class="home-bg-chameleon-body" cx="0" cy="0" rx="78" ry="48"></ellipse>
+                    <ellipse class="home-bg-chameleon-shade" cx="-8" cy="12" rx="50" ry="28"></ellipse>
+                    <circle class="home-bg-chameleon-body" cx="-66" cy="-8" r="26"></circle>
+                    <path class="home-bg-chameleon-tail" d="M74 14 C116 18 146 46 142 84 C138 116 114 138 84 138 C58 138 40 122 40 98 C40 78 54 64 72 64 C88 64 100 76 100 92 C100 106 90 116 76 120"></path>
+                    <path class="home-bg-chameleon-limb" d="M-18 42 L-42 92"></path>
+                    <path class="home-bg-chameleon-limb" d="M22 42 L44 92"></path>
+                    <path class="home-bg-chameleon-limb" d="M-52 20 L-82 84"></path>
+                    <path class="home-bg-chameleon-limb" d="M58 20 L88 80"></path>
+                    <path class="home-bg-chameleon-detail" d="M-18 -12 C6 -22 34 -22 56 -8"></path>
+                    <path class="home-bg-chameleon-detail" d="M-16 12 C12 22 42 22 64 10"></path>
+                    <circle class="home-bg-chameleon-eye" cx="-82" cy="-10" r="7.5"></circle>
+                    <circle class="home-bg-chameleon-pupil" cx="-80.5" cy="-10" r="3.2"></circle>
+                    <path class="home-bg-chameleon-tongue" d="M-98 -2 C-120 4 -132 18 -144 34"></path>
+                </g>
+            </svg>
+        </div>
     </div>
 
     <main class="home-shell">
