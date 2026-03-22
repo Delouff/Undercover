@@ -1326,26 +1326,6 @@
         .online-clue-player-history--self {
             color: rgba(208, 227, 255, 0.76);
         }
-        .online-clue-card-history {
-            position: relative;
-            z-index: 1;
-            margin: -2px 0 0;
-            min-height: 16px;
-            font-size: 0.72rem;
-            line-height: 1.25;
-            text-align: center;
-            color: rgba(188, 188, 188, 0.5);
-            letter-spacing: 0.01rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .online-clue-card-history--front {
-            color: rgba(255, 232, 198, 0.6);
-        }
-        .online-clue-card--self .online-clue-card-history {
-            color: rgba(196, 221, 255, 0.64);
-        }
         .online-clue-card {
             position: relative;
             height: 172px;
@@ -1460,8 +1440,7 @@
         .online-clue-card-name,
         .online-clue-card-status,
         .online-clue-card-word,
-        .online-clue-card-footnote,
-        .online-clue-card-history {
+        .online-clue-card-footnote {
             -webkit-transform: translateZ(2px);
             transform: translateZ(2px);
         }
@@ -4692,12 +4671,10 @@
                                 <article class="online-clue-card-face online-clue-card-face--back">
                                     <div class="online-clue-card-kicker">${backKicker}</div>
                                     <h3 class="online-clue-card-name">${escapeHtml(player.name)}</h3>
-                                    <p class="online-clue-card-history">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                                     <p class="online-clue-card-status">${escapeHtml(backStatus)}</p>
                                 </article>
                                 <article class="online-clue-card-face online-clue-card-face--front">
                                     <div class="online-clue-card-kicker">${frontKicker}</div>
-                                    <p class="online-clue-card-history online-clue-card-history--front">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                                     <p class="online-clue-card-word" style="${getOnlineClueWordStyle(submittedClue ? submittedClue.text : '')}">${submittedClue ? escapeHtml(submittedClue.text) : '&nbsp;'}</p>
                                     <p class="online-clue-card-footnote">${escapeHtml(String(frontFootnote).replace(/\u00c2\u00b7/g, ' - '))}</p>
                                 </article>
@@ -4881,12 +4858,10 @@
                                     <div class="online-clue-card-face online-clue-card-face--back">
                                         <div class="online-clue-card-kicker">Carte du joueur</div>
                                         <p class="online-clue-card-name">${escapeHtml(entry.playerName)}</p>
-                                        <p class="online-clue-card-history">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                                         <p class="online-clue-card-status">Le mot a deja ete revele.</p>
                                     </div>
                                     <div class="online-clue-card-face online-clue-card-face--front">
                                         <div class="online-clue-card-kicker">Mot du tour</div>
-                                        <p class="online-clue-card-history online-clue-card-history--front">${pastCluesText ? escapeHtml(pastCluesText) : '&nbsp;'}</p>
                                         <p class="online-clue-card-word" style="${getOnlineClueWordStyle(entry.text)}">${escapeHtml(entry.text)}</p>
                                         <p class="online-clue-card-footnote">${escapeHtml(footnote)}</p>
                                     </div>
