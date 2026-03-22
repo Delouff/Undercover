@@ -71,10 +71,10 @@
             inset: 0;
             background:
                 radial-gradient(circle at center, transparent 34%, rgba(0, 0, 0, 0.42) 76%, rgba(0, 0, 0, 0.72) 100%),
-                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M650 648 C760 608 892 604 1062 642' stroke='rgba(103,74,56,0.58)' stroke-width='18'/%3E%3Cpath d='M822 520 C874 520 914 548 914 598 C914 654 870 696 812 696 C764 696 726 662 726 612 C726 566 760 534 800 534 C842 534 868 560 868 594 C868 622 848 640 826 646' stroke='rgba(136,223,182,0.42)' stroke-width='6'/%3E%3Cellipse cx='816' cy='520' rx='122' ry='76' fill='rgba(38,79,69,0.34)' stroke='rgba(136,223,182,0.28)' stroke-width='4'/%3E%3Ccircle cx='716' cy='506' r='36' fill='rgba(38,79,69,0.34)' stroke='rgba(136,223,182,0.28)' stroke-width='4'/%3E%3Cpath d='M784 472 L876 432' stroke='rgba(136,223,182,0.24)' stroke-width='6'/%3E%3Cpath d='M784 586 L744 656' stroke='rgba(136,223,182,0.22)' stroke-width='6'/%3E%3Cpath d='M848 586 L890 654' stroke='rgba(136,223,182,0.22)' stroke-width='6'/%3E%3Cpath d='M1020 302 C1068 318 1098 346 1086 402' stroke='rgba(217,92,73,0.28)' stroke-width='4' stroke-dasharray='10 12'/%3E%3Cpath d='M1160 220 C1108 238 1070 270 1086 402' stroke='rgba(217,92,73,0.28)' stroke-width='4' stroke-dasharray='10 12'/%3E%3Crect x='972' y='166' width='136' height='88' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Crect x='1122' y='188' width='132' height='82' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Crect x='1026' y='320' width='136' height='88' rx='12' fill='rgba(229,217,196,0.04)' stroke='rgba(255,255,255,0.05)' stroke-width='1.2'/%3E%3Ccircle cx='1020' cy='302' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Ccircle cx='1160' cy='220' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Ccircle cx='1086' cy='402' r='8' fill='rgba(255,223,176,0.44)'/%3E%3Cpath d='M1176 640 C1218 588 1284 572 1334 592 C1298 616 1282 642 1278 672 C1246 652 1210 648 1176 640 Z' fill='rgba(8,11,11,0.28)' stroke='rgba(255,255,255,0.04)' stroke-width='1.2'/%3E%3C/g%3E%3C/svg%3E");
+                linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.22));
             background-repeat: no-repeat;
-            background-position: center center, center 70%;
-            background-size: cover, min(1380px, 102vw) auto;
+            background-position: center center, center center;
+            background-size: cover, cover;
             opacity: 0.94;
         }
         .silhouette {
@@ -394,46 +394,6 @@
             stroke: rgba(255, 255, 255, 0.08);
             stroke-width: 1.2;
         }
-        .home-art-shadow {
-            fill: rgba(0, 0, 0, 0.28);
-            filter: blur(8px);
-        }
-        .home-chameleon {
-            animation: homeChameleonSway 7.2s ease-in-out infinite;
-            transform-origin: center;
-        }
-        .home-chameleon-body {
-            fill: rgba(44, 90, 78, 0.8);
-            stroke: rgba(140, 224, 180, 0.52);
-            stroke-width: 4;
-        }
-        .home-chameleon-tail,
-        .home-chameleon-leg,
-        .home-chameleon-branch {
-            fill: none;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-        .home-chameleon-tail {
-            stroke: rgba(140, 224, 180, 0.56);
-            stroke-width: 6;
-        }
-        .home-chameleon-leg {
-            stroke: rgba(110, 187, 153, 0.52);
-            stroke-width: 6;
-        }
-        .home-chameleon-branch {
-            stroke: rgba(104, 74, 56, 0.72);
-            stroke-width: 18;
-        }
-        .home-chameleon-eye {
-            fill: #f7ffd7;
-            animation: homeEyeBlink 6.6s ease-in-out infinite;
-            transform-origin: center;
-        }
-        .home-chameleon-pupil {
-            fill: #101312;
-        }
         .home-animal-silhouette {
             fill: rgba(14, 17, 16, 0.86);
             stroke: rgba(255, 255, 255, 0.05);
@@ -734,22 +694,6 @@
             100% {
                 stroke-dashoffset: -48;
                 opacity: 0.36;
-            }
-        }
-        @keyframes homeChameleonSway {
-            0%, 100% {
-                transform: translateY(0) rotate(-1deg);
-            }
-            50% {
-                transform: translateY(-8px) rotate(1deg);
-            }
-        }
-        @keyframes homeEyeBlink {
-            0%, 44%, 52%, 100% {
-                transform: scaleY(1);
-            }
-            48% {
-                transform: scaleY(0.16);
             }
         }
         @keyframes homeGlintPulse {
@@ -2001,7 +1945,6 @@
         </div>
         <svg class="home-art" viewBox="0 0 1440 900">
             <g>
-                <ellipse class="home-art-shadow" cx="906" cy="732" rx="310" ry="48"></ellipse>
                 <circle class="home-magnifier-ring" cx="1048" cy="350" r="122"></circle>
                 <path class="home-magnifier-handle" d="M1136 438 L1240 548"></path>
                 <rect class="home-board" x="836" y="110" width="430" height="306" rx="28"></rect>
@@ -2016,20 +1959,6 @@
                 <circle class="home-board-node" cx="1140" cy="198" r="8"></circle>
                 <circle class="home-board-node" cx="1014" cy="326" r="8"></circle>
                 <circle class="home-board-node" cx="1180" cy="318" r="8"></circle>
-
-                <g class="home-chameleon" transform="translate(820 520)">
-                    <path class="home-chameleon-branch" d="M-180 122 C-72 94 72 94 218 130"></path>
-                    <ellipse class="home-chameleon-body" cx="0" cy="0" rx="126" ry="78"></ellipse>
-                    <circle class="home-chameleon-body" cx="-104" cy="-12" r="38"></circle>
-                    <path class="home-chameleon-tail" d="M114 18 C178 24 222 70 214 126 C208 170 176 198 134 198 C98 198 72 178 72 144 C72 116 92 96 118 96 C140 96 154 110 154 128 C154 146 142 158 126 163"></path>
-                    <path class="home-chameleon-leg" d="M-34 72 L-64 132"></path>
-                    <path class="home-chameleon-leg" d="M22 72 L54 132"></path>
-                    <path class="home-chameleon-leg" d="M-88 44 L-126 116"></path>
-                    <path class="home-chameleon-leg" d="M72 44 L108 114"></path>
-                    <path class="home-chameleon-leg" d="M34 -48 L120 -84"></path>
-                    <circle class="home-chameleon-eye" cx="-118" cy="-18" r="10"></circle>
-                    <circle class="home-chameleon-pupil" cx="-116" cy="-18" r="4"></circle>
-                </g>
 
                 <g transform="translate(1188 590)">
                     <path class="home-animal-silhouette" d="M-44 94 C-60 26 -36 -18 0 -40 C22 -52 48 -48 62 -28 L90 -52 L84 -18 C102 0 108 26 102 54 C92 100 50 134 0 134 C-22 134 -38 120 -44 94 Z"></path>
@@ -2083,7 +2012,7 @@
                 </div>
                 <h1 class="home-title"><span class="home-title-accent">Qui ment le mieux ?</span>Undercover</h1>
             </div>
-            <p class="home-subtitle">Observe les indices, piste le caméléon et trouve qui se fond dans le groupe avant que le salon ne se retourne contre toi.</p>
+            <p class="home-subtitle">Observe les indices, piste les incoherences et trouve qui se fond dans le groupe avant que le salon ne se retourne contre toi.</p>
             <div class="home-tags">
                 <span class="home-tag">Ambiance detective</span>
                 <span class="home-tag">Bluff et intuition</span>
@@ -3856,6 +3785,81 @@
                     });
                 });
 
+                function openLocalMrWhiteWinnerPopup(withUndercover = false) {
+                    let decipherPopup = document.createElement('div');
+                    decipherPopup.style.position = 'fixed';
+                    decipherPopup.style.top = '0';
+                    decipherPopup.style.left = '0';
+                    decipherPopup.style.width = '100vw';
+                    decipherPopup.style.height = '100vh';
+                    decipherPopup.style.background = 'rgba(0,0,0,0.7)';
+                    decipherPopup.style.display = 'flex';
+                    decipherPopup.style.justifyContent = 'center';
+                    decipherPopup.style.alignItems = 'center';
+                    decipherPopup.style.zIndex = '9999';
+
+                    decipherPopup.innerHTML = `
+                        <div style="background:#fff;color:#222;padding:40px 30px;border-radius:16px;box-shadow:0 8px 32px #0007;text-align:center;min-width:220px;">
+                            <div style="margin-bottom:24px;font-size:1.3rem;">
+                                <b>MrWhite peut dechiffrer le mot !</b><br>
+                                <span style="font-size:1.05rem;">Il ne reste plus que deux joueurs. Tente de retrouver le mot des civils.</span>
+                            </div>
+                            <input type="text" id="localMrWhiteFinalGuess" placeholder="Votre proposition..." style="padding:10px;font-size:1rem;border-radius:8px;border:1px solid #ccc;margin-bottom:12px;width:80%;">
+                            <div id="localMrWhiteFinalGuessError" style="min-height:22px;margin-bottom:12px;color:#b42318;font-size:0.95rem;"></div>
+                            <button id="localMrWhiteFinalGuessBtn" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#4caf50;color:#fff;cursor:pointer;margin-bottom:10px;">Valider</button>
+                            <br>
+                            <button id="localMrWhiteFinalSkipBtn" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#222;color:#fff;cursor:pointer;">Je ne sais pas</button>
+                        </div>
+                    `;
+                    document.body.appendChild(decipherPopup);
+
+                    const input = document.getElementById('localMrWhiteFinalGuess');
+                    const errorBox = document.getElementById('localMrWhiteFinalGuessError');
+                    const submitBtn = document.getElementById('localMrWhiteFinalGuessBtn');
+                    const skipBtn = document.getElementById('localMrWhiteFinalSkipBtn');
+                    input.focus();
+
+                    function closeWithResult(success) {
+                        const secretWord = joueurs.find(j => j.role === "civil")?.mot || motCivil;
+                        const teamLabel = withUndercover
+                            ? `<b>Victoire de MrWhite et de l'Undercover !</b>`
+                            : `<b>Victoire de MrWhite !</b>`;
+                        const message = success
+                            ? `${teamLabel}<br><span style="font-size:1.1rem;">MrWhite a dechiffre le mot des civils : <span style="color:#4caf50">${escapeHtml(secretWord)}</span></span>`
+                            : `${teamLabel}<br><span style="font-size:1.1rem;">MrWhite gagne, mais ne connait pas le mot des civils.</span>`;
+
+                        if (decipherPopup.parentNode) {
+                            decipherPopup.parentNode.removeChild(decipherPopup);
+                        }
+                        showEndGamePopup(message, "#d32f2f");
+                    }
+
+                    function submitGuess() {
+                        const secretWord = joueurs.find(j => j.role === "civil")?.mot || motCivil;
+                        const guess = input.value.trim();
+                        if (!guess) {
+                            errorBox.textContent = 'Entre un mot avant de valider.';
+                            input.focus();
+                            return;
+                        }
+
+                        const success = normalizeClueTextForComparison(guess) === normalizeClueTextForComparison(secretWord);
+                        closeWithResult(success);
+                    }
+
+                    input.addEventListener('keydown', function(event) {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            submitGuess();
+                        }
+                    });
+
+                    submitBtn.addEventListener('click', submitGuess);
+                    skipBtn.addEventListener('click', function() {
+                        closeWithResult(false);
+                    });
+                }
+
                 function checkEndGame(joueurs) {
                     const alivePlayers = joueurs.filter(j => !j.eliminer);
                     const aliveCount = alivePlayers.length;
@@ -3866,11 +3870,13 @@
                     if (aliveCount <= 2 && (undercoverAlive || mrWhiteAlive)) {
                         let message = "";
                         if (undercoverAlive && mrWhiteAlive) {
-                            message = `<b>Victoire de MrWhite et de l'Undercover !</b><br><span style="font-size:1.1rem;">Il ne reste plus que deux joueurs, les rôles spéciaux gagnent ensemble !</span>`;
+                            openLocalMrWhiteWinnerPopup(true);
+                            return true;
                         } else if (undercoverAlive) {
                             message = `<b>Victoire de l'Undercover !</b><br><span style="font-size:1.1rem;">Il ne reste plus que deux joueurs, l'Undercover remporte la partie !</span>`;
                         } else if (mrWhiteAlive) {
-                            message = `<b>Victoire de MrWhite !</b><br><span style="font-size:1.1rem;">Il ne reste plus que deux joueurs, MrWhite remporte la partie !</span>`;
+                            openLocalMrWhiteWinnerPopup(false);
+                            return true;
                         }
                         showEndGamePopup(message, "#d32f2f");
                         return true;

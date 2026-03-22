@@ -606,6 +606,31 @@ function finishSession(session, summary, winner) {
     session.winner = winner;
 }
 
+function resolveSessionOutcome(session, summary) {
+    const winner = determineWinner(session);
+    if (!winner) {
+        beginNextRound(session, summary);
+        return false;
+    }
+
+    if (winner.team === 'mrwhite' || winner.team === 'special') {
+        const mrWhitePlayer = getMrWhitePlayer(session, true);
+        if (mrWhitePlayer) {
+            startMrWhiteGuessPhase(session, {
+                playerId: mrWhitePlayer.id,
+                reason: 'winner',
+                baseWinner: winner,
+                sourceSummary: summary
+            });
+            session.lastRoundSummary = summary;
+            return true;
+        }
+    }
+
+    finishSession(session, summary, winner);
+    return true;
+}
+
 function returnSessionToWaiting(session) {
     session.status = 'waiting';
     session.assignments = null;
@@ -654,7 +679,7 @@ function resolveDiscussion(session) {
                 ? 'Le vote est reste indecis. Personne n est elimine et un nouveau tour commence.'
                 : 'Le salon a choisi de passer le debat. Personne n est elimine et un nouveau tour commence.'
         };
-        beginNextRound(session, summary);
+        resolveSessionOutcome(session, summary);
         return;
     }
 
@@ -677,26 +702,7 @@ function resolveDiscussion(session) {
         return;
     }
 
-    const winner = determineWinner(session);
-    if (winner) {
-        if (winner.team === 'mrwhite' || winner.team === 'special') {
-            const mrWhitePlayer = getMrWhitePlayer(session, true);
-            if (mrWhitePlayer) {
-                startMrWhiteGuessPhase(session, {
-                    playerId: mrWhitePlayer.id,
-                    reason: 'winner',
-                    baseWinner: winner,
-                    sourceSummary: summary
-                });
-                session.lastRoundSummary = summary;
-                return;
-            }
-        }
-        finishSession(session, summary, winner);
-        return;
-    }
-
-    beginNextRound(session, summary);
+    resolveSessionOutcome(session, summary);
 }
 
 function buildSessionView(session, playerId) {
