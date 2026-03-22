@@ -3481,9 +3481,7 @@
             let joueurs = [];
             let turnState = {
                 currentIndex: 0,
-                choosingIndex: null,
                 lastSubmittedIndex: null,
-                popupOpen: false,
                 pendingTimeout: null
             };
 
@@ -3598,8 +3596,7 @@
                             role,
                             mot,
                             eliminer: false,
-                            motPropose: '',
-                            historiqueMots: []
+                            hasSpokenThisRound: false
                         };
 
                         cardElement.innerHTML = `<span style="font-size:1.2rem; word-break:break-all; text-align:center; max-width:100px; overflow:hidden;">${escapeHtml(pseudo)}</span>`;
@@ -3628,6 +3625,7 @@
                                 }
 
                                 btn.addEventListener('click', function() {
+                                    prepareLocalRound(-1);
                                     showGameScreen(joueurs, mrWhite, undercover);
                                 });
                             }
@@ -3643,94 +3641,39 @@
             }
 
             function allPlayersSubmittedWord() {
-                return joueurs.length > 0 && joueurs.every(joueur => joueur && joueur.motPropose && joueur.motPropose.trim() !== '');
+                const activePlayers = joueurs.filter((joueur) => joueur && !joueur.eliminer);
+                return activePlayers.length > 0 && activePlayers.every((joueur) => joueur.hasSpokenThisRound);
             }
 
             function findNextPlayerWithoutWord(startIndex = -1) {
                 for (let step = 1; step <= joueurs.length; step++) {
                     const idx = (startIndex + step) % joueurs.length;
-                    if (!joueurs[idx].motPropose || joueurs[idx].motPropose.trim() === '') {
+                    if (joueurs[idx] && !joueurs[idx].eliminer && !joueurs[idx].hasSpokenThisRound) {
                         return idx;
                     }
                 }
                 return null;
             }
 
-            function openTurnWordDialog(mrWhiteActive = mrWhite, undercoverActive = undercover) {
-                const idx = turnState.currentIndex;
-                if (idx === null || idx === undefined) return;
-
-                const joueur = joueurs[idx];
-                turnState.popupOpen = true;
-                const overlay = createDialog(`
-                    <div class="dialog-kicker">Tour de ${escapeHtml(joueur.pseudo)}</div>
-                    <h3>Propose ton mot</h3>
-                    <p>Entre un mot ou un indice court. Il sera montre aux autres joueurs des que tu le valides.</p>
-                    <input id="turnWordInput" class="dialog-input" type="text" maxlength="24" placeholder="Exemple : rapide">
-                    <div id="turnWordError" class="dialog-error" style="display:none;"></div>
-                    <div class="dialog-actions">
-                        <button id="turnWordConfirmBtn" type="button">Valider le mot</button>
-                    </div>
-                `);
-
-                const input = document.getElementById('turnWordInput');
-                const errorBox = document.getElementById('turnWordError');
-                input.focus();
-
-                input.addEventListener('keydown', function(event) {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        submitTurnWord();
+            function prepareLocalRound(startIndex = -1) {
+                joueurs.forEach((joueur) => {
+                    if (joueur && !joueur.eliminer) {
+                        joueur.hasSpokenThisRound = false;
                     }
                 });
+                turnState.currentIndex = findNextPlayerWithoutWord(startIndex);
+                turnState.lastSubmittedIndex = null;
+            }
 
-                document.getElementById('turnWordConfirmBtn').addEventListener('click', submitTurnWord);
-
-                function submitTurnWord() {
-                    const value = input.value.trim().substring(0, 24);
-
-                    if (!value) {
-                        errorBox.textContent = 'Entre un mot avant de valider.';
-                        errorBox.style.display = 'block';
-                        input.focus();
-                        return;
-                    }
-
-                    const normalizedValue = normalizeClueTextForComparison(value);
-                    const duplicateWord = joueurs.some((otherPlayer, otherIndex) => {
-                        if (otherIndex === idx || !otherPlayer) return false;
-                        const currentWord = normalizeClueTextForComparison(otherPlayer.motPropose || '');
-                        const historyWords = Array.isArray(otherPlayer.historiqueMots) ? otherPlayer.historiqueMots : [];
-                        return currentWord === normalizedValue
-                            || historyWords.some((word) => normalizeClueTextForComparison(word) === normalizedValue);
-                    });
-
-                    if (duplicateWord) {
-                        errorBox.textContent = 'Ce mot a deja ete propose pendant cette partie.';
-                        errorBox.style.display = 'block';
-                        input.focus();
-                        return;
-                    }
-
-                    joueur.motPropose = value;
-                    if (!Array.isArray(joueur.historiqueMots)) {
-                        joueur.historiqueMots = [];
-                    }
-                    joueur.historiqueMots.push(value);
-                    turnState.popupOpen = false;
-                    turnState.choosingIndex = null;
-                    turnState.lastSubmittedIndex = idx;
-                    turnState.currentIndex = findNextPlayerWithoutWord(idx);
-                    closeDialog(overlay);
-                    showGameScreen(joueurs, mrWhiteActive, undercoverActive);
-                }
+            function beginNextLocalRound(startIndex = -1, mrWhiteActive = mrWhite, undercoverActive = undercover) {
+                prepareLocalRound(startIndex);
+                showGameScreen(joueurs, mrWhiteActive, undercoverActive);
             }
 
             function showGameScreen(joueurs, mrWhiteActive = mrWhite, undercoverActive = undercover) {
                 joueurs.forEach(j => {
                     if (j.eliminer === undefined) j.eliminer = false;
-                    if (j.motPropose === undefined) j.motPropose = '';
-                    if (!Array.isArray(j.historiqueMots)) j.historiqueMots = [];
+                    if (j.hasSpokenThisRound === undefined) j.hasSpokenThisRound = false;
                 });
 
                 if (turnState.pendingTimeout) {
@@ -3740,44 +3683,29 @@
 
                 if (checkEndGame(joueurs)) return;
 
-                const allWordsDone = allPlayersSubmittedWord();
-                if (!allWordsDone) {
-                    if (turnState.currentIndex === null || turnState.currentIndex === undefined || (joueurs[turnState.currentIndex] && joueurs[turnState.currentIndex].motPropose)) {
-                        turnState.currentIndex = findNextPlayerWithoutWord(turnState.currentIndex ?? -1);
-                    }
-                } else {
-                    turnState.currentIndex = null;
-                    turnState.choosingIndex = null;
-                    turnState.popupOpen = false;
+                if (
+                    turnState.currentIndex === null
+                    || turnState.currentIndex === undefined
+                    || !joueurs[turnState.currentIndex]
+                    || joueurs[turnState.currentIndex].eliminer
+                ) {
+                    const firstAliveIndex = joueurs.findIndex((joueur) => joueur && !joueur.eliminer);
+                    turnState.currentIndex = firstAliveIndex >= 0 ? firstAliveIndex : null;
                 }
 
                 const currentTurnPlayer = turnState.currentIndex !== null && turnState.currentIndex !== undefined
                     ? joueurs[turnState.currentIndex]
                     : null;
-                const choosingPlayer = turnState.choosingIndex !== null && turnState.choosingIndex !== undefined
-                    ? joueurs[turnState.choosingIndex]
-                    : null;
-
-                let turnStatus = '';
-                if (allWordsDone) {
-                    if (turnState.lastSubmittedIndex !== null && turnState.lastSubmittedIndex !== undefined) {
-                        const lastPlayer = joueurs[turnState.lastSubmittedIndex];
-                        turnStatus = `${lastPlayer.pseudo} a valide le mot "${lastPlayer.motPropose}". Tous les joueurs ont propose un mot. Vous pouvez maintenant passer aux identifications.`;
-                    } else {
-                        turnStatus = "Tous les joueurs ont propose un mot. Vous pouvez maintenant passer aux identifications.";
+                const activePlayerIndexes = joueurs.reduce((indexes, joueur, idx) => {
+                    if (joueur && !joueur.eliminer) {
+                        indexes.push(idx);
                     }
-                } else if (choosingPlayer) {
-                    turnStatus = `${choosingPlayer.pseudo} choisit son mot...`;
-                } else if (turnState.lastSubmittedIndex !== null && turnState.lastSubmittedIndex !== undefined) {
-                    const lastPlayer = joueurs[turnState.lastSubmittedIndex];
-                    turnStatus = `${lastPlayer.pseudo} a valide le mot "${lastPlayer.motPropose}".`;
-                } else if (currentTurnPlayer) {
-                    turnStatus = `${currentTurnPlayer.pseudo} choisit son mot...`;
-                }
+                    return indexes;
+                }, []);
 
-                if (!allWordsDone && turnState.choosingIndex === null && turnState.lastSubmittedIndex === null && currentTurnPlayer) {
-                    turnState.choosingIndex = turnState.currentIndex;
-                    turnStatus = `${currentTurnPlayer.pseudo} choisit son mot...`;
+                let turnStatus = `Les joueurs donnent maintenant leur mot a l'oral autour de la table. Suivez l'ordre affiche puis lancez le debat quand vous le souhaitez.`;
+                if (currentTurnPlayer) {
+                    turnStatus += ` ${currentTurnPlayer.pseudo} peut commencer.`;
                 }
 
                 let html = `
@@ -3804,12 +3732,15 @@
                         <div class="local-status-list">
                             ${joueurs.map((joueur, idx) => {
                                 let statusLabel = '<span style="opacity:0.7;">En attente</span>';
-                                if (joueur.motPropose) {
-                                    statusLabel = `<span style="font-weight:bold;color:#fff;">${escapeHtml(joueur.motPropose)}</span>`;
-                                } else if (!allWordsDone && turnState.choosingIndex === idx) {
-                                    statusLabel = `<span style="color:#ffd180;">${escapeHtml(joueur.pseudo)} choisit son mot...</span>`;
-                                } else if (!allWordsDone && turnState.currentIndex === idx) {
-                                    statusLabel = '<span style="color:#ffe082;">Son tour arrive maintenant</span>';
+                                if (joueur.eliminer) {
+                                    statusLabel = '<span style="opacity:0.7;">Elimine</span>';
+                                } else {
+                                    const orderIndex = activePlayerIndexes.indexOf(idx);
+                                    if (orderIndex === 0) {
+                                        statusLabel = '<span style="color:#ffd180;">Commence la manche</span>';
+                                    } else if (orderIndex >= 0) {
+                                        statusLabel = `<span style="font-weight:bold;color:#fff;">Ordre ${orderIndex + 1}</span>`;
+                                    }
                                 }
 
                                 return `
@@ -3824,10 +3755,11 @@
                     <div class="local-identify-panel">
                 `;
                 joueurs.forEach((joueur, idx) => {
+                    const canIdentifyPlayer = !joueur.eliminer;
                     html += `
                         <div class="local-identify-row">
                             <span class="pseudo-joueur local-identify-name" data-idx="${idx}" style="${joueur.eliminer ? 'text-decoration: line-through; color: #aaa;' : ''}">${joueur.pseudo}</span>
-                            <button class="identifierBtn" data-idx="${idx}" style="padding:8px 24px;font-size:1rem;border:none;border-radius:8px;background:${allWordsDone ? '#ff9800' : '#777'};color:#fff;cursor:${allWordsDone && !joueur.eliminer ? 'pointer' : 'not-allowed'};opacity:${joueur.eliminer || !allWordsDone ? '0.65' : '1'};" ${joueur.eliminer || !allWordsDone ? 'disabled' : ''}>${allWordsDone ? 'Identifier' : 'Attendre le tour'}</button>
+                            <button class="identifierBtn" data-idx="${idx}" style="padding:8px 24px;font-size:1rem;border:none;border-radius:8px;background:${canIdentifyPlayer ? '#ff9800' : '#777'};color:#fff;cursor:${canIdentifyPlayer ? 'pointer' : 'not-allowed'};opacity:${canIdentifyPlayer ? '1' : '0.65'};" ${canIdentifyPlayer ? '' : 'disabled'}>Identifier</button>
                         </div>
                     `;
                 });
@@ -3837,20 +3769,6 @@
                     lobbyMessage: 'Interrompre la partie locale et revenir au salon ?',
                     homeMessage: 'Quitter la partie locale en cours et revenir a l accueil ?'
                 });
-
-                if (!allWordsDone && turnState.lastSubmittedIndex !== null && turnState.currentIndex !== null) {
-                    turnState.pendingTimeout = window.setTimeout(() => {
-                        turnState.lastSubmittedIndex = null;
-                        turnState.choosingIndex = turnState.currentIndex;
-                        showGameScreen(joueurs, mrWhiteActive, undercoverActive);
-                    }, 1800);
-                } else if (!allWordsDone && turnState.choosingIndex !== null && !turnState.popupOpen) {
-                    turnState.pendingTimeout = window.setTimeout(() => {
-                        if (!turnState.popupOpen && turnState.choosingIndex !== null && !allPlayersSubmittedWord()) {
-                            openTurnWordDialog(mrWhiteActive, undercoverActive);
-                        }
-                    }, 80);
-                }
 
                 document.querySelectorAll('.identifierBtn').forEach(btn => {
                     btn.addEventListener('click', function() {
@@ -3925,27 +3843,23 @@
 
                                     document.getElementById('closeDecipherPopup').addEventListener('click', function() {
                                         document.body.removeChild(decipherPopup);
-                                        showGameScreen(joueurs);
+                                        beginNextLocalRound(idx, mrWhiteActive, undercoverActive);
                                     });
 
                                     document.getElementById('submitGuess').addEventListener('click', function() {
                                         const motCivil = joueurs.find(j => j.role === "civil")?.mot;
                                         const guess = document.getElementById('guessWord').value.trim().toLowerCase();
-                                        let resultMsg;
                                         if (motCivil && guess === motCivil.toLowerCase()) {
-                                            resultMsg = `<b>Bravo !</b> MrWhite a trouvé le mot secret : <span style="color:#4caf50">${motCivil}</span>`;
+                                            document.body.removeChild(decipherPopup);
+                                            showEndGamePopup(`<b>Victoire de MrWhite !</b><br><span style="font-size:1.1rem;">MrWhite a dechiffre le mot secret : <span style="color:#fff;">${escapeHtml(motCivil)}</span></span>`, "#d32f2f");
                                         } else {
-                                            resultMsg = `<b>Dommage !</b> Ce n'était pas le mot secret.`;
+                                            document.body.removeChild(decipherPopup);
+                                            showResultPopup("MrWhite a ete demasque, mais il ne connait pas le mot des civils. La partie continue sans lui.", "#ff9800", joueurs, idx);
                                         }
-                                        document.getElementById('guessWord').disabled = true;
-                                        document.getElementById('submitGuess').disabled = true;
-                                        let resultDiv = document.createElement('div');
-                                        resultDiv.innerHTML = `<div style="margin-top:20px;font-size:1.2rem;">${resultMsg}</div>`;
-                                        decipherPopup.querySelector('div').appendChild(resultDiv);
                                     });
                                 } else {
                                     joueurs[idx].eliminer = true;
-                                    showResultPopup("MrWhite se cache encore parmi vous ! Ce joueur est éliminé.", "#ff9800", joueurs);
+                                    showResultPopup("MrWhite se cache encore parmi vous ! Ce joueur est elimine.", "#ff9800", joueurs, idx);
                                 }
                             });
                         }
@@ -3987,12 +3901,12 @@
                                     });
                                 } else {
                                     joueurs[idx].eliminer = true;
-                                    showResultPopup("L'Undercover se cache encore parmi vous ! Ce joueur est éliminé.", "#ff9800", joueurs);
+                                    showResultPopup("L'Undercover se cache encore parmi vous ! Ce joueur est elimine.", "#ff9800", joueurs, idx);
                                 }
                             });
                         }
 
-                        function showResultPopup(message, color, joueurs) {
+                        function showResultPopup(message, color, joueurs, startIndex = -1) {
                             let resultPopup = document.createElement('div');
                             resultPopup.style.position = 'fixed';
                             resultPopup.style.top = '0';
@@ -4013,7 +3927,7 @@
                             document.body.appendChild(resultPopup);
                             document.getElementById('closeResultPopup').addEventListener('click', function() {
                                 document.body.removeChild(resultPopup);
-                                showGameScreen(joueurs);
+                                beginNextLocalRound(startIndex, mrWhiteActive, undercoverActive);
                             });
                         }
                     });
