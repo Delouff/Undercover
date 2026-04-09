@@ -3753,13 +3753,14 @@
                         </div>
                         </div>
                     <div class="local-identify-panel">
+                        <div style="font-size:0.94rem;line-height:1.45;color:#d7d7d7;margin-bottom:10px;">Clique un pseudo pour identifier un role. Le bouton a droite permet de revoir le mot du joueur.</div>
                 `;
                 joueurs.forEach((joueur, idx) => {
                     const canIdentifyPlayer = !joueur.eliminer;
                     html += `
                         <div class="local-identify-row">
-                            <span class="pseudo-joueur local-identify-name" data-idx="${idx}" style="${joueur.eliminer ? 'text-decoration: line-through; color: #aaa;' : ''}">${joueur.pseudo}</span>
-                            <button class="identifierBtn" data-idx="${idx}" style="padding:8px 24px;font-size:1rem;border:none;border-radius:8px;background:${canIdentifyPlayer ? '#ff9800' : '#777'};color:#fff;cursor:${canIdentifyPlayer ? 'pointer' : 'not-allowed'};opacity:${canIdentifyPlayer ? '1' : '0.65'};" ${canIdentifyPlayer ? '' : 'disabled'}>Identifier</button>
+                            <button type="button" class="localIdentifyTrigger local-identify-name" data-idx="${idx}" style="padding:0;border:none;background:none;text-align:left;cursor:${canIdentifyPlayer ? 'pointer' : 'not-allowed'};opacity:${canIdentifyPlayer ? '1' : '0.65'};${joueur.eliminer ? 'text-decoration: line-through; color: #aaa;' : 'color:#fff;'}" ${canIdentifyPlayer ? '' : 'disabled'} title="Identifier ce joueur">${joueur.pseudo}</button>
+                            <button class="reviewLocalWordBtn" data-idx="${idx}" style="padding:8px 20px;font-size:0.98rem;border:none;border-radius:8px;background:${canIdentifyPlayer ? '#5a6b85' : '#777'};color:#fff;cursor:${canIdentifyPlayer ? 'pointer' : 'not-allowed'};opacity:${canIdentifyPlayer ? '1' : '0.65'};" ${canIdentifyPlayer ? '' : 'disabled'}>Revoir mon mot</button>
                         </div>
                     `;
                 });
@@ -3770,7 +3771,36 @@
                     homeMessage: 'Quitter la partie locale en cours et revenir a l accueil ?'
                 });
 
-                document.querySelectorAll('.identifierBtn').forEach(btn => {
+                function openLocalWordReminderDialog(joueur) {
+                    if (!joueur) return;
+
+                    const message = joueur.role === 'mrwhite'
+                        ? `<b>Force a toi MrWhite !</b><br><i>Tu n'as pas de mot.</i>`
+                        : `Ton mot : <b>${escapeHtml(joueur.mot)}</b>`;
+
+                    const overlay = createDialog(`
+                        <div class="dialog-kicker">${escapeHtml(joueur.pseudo)}</div>
+                        <h3>Carte secrete</h3>
+                        <div class="dialog-word">${message}</div>
+                        <p>Memorise bien ton mot avant de refermer cette carte.</p>
+                        <div class="dialog-actions">
+                            <button id="closeLocalWordReminderBtn" type="button">Fermer</button>
+                        </div>
+                    `);
+
+                    document.getElementById('closeLocalWordReminderBtn').addEventListener('click', function() {
+                        closeDialog(overlay);
+                    });
+                }
+
+                document.querySelectorAll('.reviewLocalWordBtn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const idx = parseInt(this.getAttribute('data-idx'), 10);
+                        openLocalWordReminderDialog(joueurs[idx]);
+                    });
+                });
+
+                document.querySelectorAll('.localIdentifyTrigger').forEach(btn => {
                     btn.addEventListener('click', function() {
                         let idx = parseInt(this.getAttribute('data-idx'), 10);
                         let popup = document.createElement('div');
