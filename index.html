@@ -4034,9 +4034,18 @@
                                     `;
                                     document.body.appendChild(decipherPopup);
 
+                                    function handleMrWhiteFailure() {
+                                        if (decipherPopup.parentNode) {
+                                            document.body.removeChild(decipherPopup);
+                                        }
+                                        if (checkEndGame(joueurs)) {
+                                            return;
+                                        }
+                                        showResultPopup("MrWhite a ete demasque, mais il ne connait pas le mot des civils. La partie continue sans lui.", "#ff9800", joueurs, idx);
+                                    }
+
                                     document.getElementById('closeDecipherPopup').addEventListener('click', function() {
-                                        document.body.removeChild(decipherPopup);
-                                        beginNextLocalRound(idx, mrWhiteActive, undercoverActive);
+                                        handleMrWhiteFailure();
                                     });
 
                                     document.getElementById('submitGuess').addEventListener('click', function() {
@@ -4046,8 +4055,7 @@
                                             document.body.removeChild(decipherPopup);
                                             showEndGamePopup(`<b>Victoire de MrWhite !</b><br><span style="font-size:1.1rem;">MrWhite a dechiffre le mot secret : <span style="color:#fff;">${escapeHtml(motCivil)}</span></span>`, "#d32f2f");
                                         } else {
-                                            document.body.removeChild(decipherPopup);
-                                            showResultPopup("MrWhite a ete demasque, mais il ne connait pas le mot des civils. La partie continue sans lui.", "#ff9800", joueurs, idx);
+                                            handleMrWhiteFailure();
                                         }
                                     });
                                 } else {
@@ -4063,35 +4071,21 @@
                                 document.body.removeChild(popup);
                                 if (joueurs[idx].role === "undercover") {
                                     joueurs[idx].eliminer = true;
-                                    const mrWhiteAlive = joueurs.some(j => j.role === "mrwhite" && !j.eliminer);
-
-                                    let message = `<b>L'Undercover a été détecté !</b><br><span style="font-size:1.1rem;">Victoire des Civils !</span>`;
-                                    if (mrWhiteAlive) {
-                                        message += `<br><span style="color:#d32f2f;font-size:1.1rem;">MrWhite n'a pas été trouvé !</span>`;
+                                    if (checkEndGame(joueurs)) {
+                                        return;
                                     }
 
-                                    let endPopup = document.createElement('div');
-                                    endPopup.style.position = 'fixed';
-                                    endPopup.style.top = '0';
-                                    endPopup.style.left = '0';
-                                    endPopup.style.width = '100vw';
-                                    endPopup.style.height = '100vh';
-                                    endPopup.style.background = 'rgba(0,0,0,0.7)';
-                                    endPopup.style.display = 'flex';
-                                    endPopup.style.justifyContent = 'center';
-                                    endPopup.style.alignItems = 'center';
-                                    endPopup.style.zIndex = '9999';
-                                    endPopup.innerHTML = `
-                                        <div style="background:#4caf50;color:#fff;padding:40px 30px;border-radius:16px;box-shadow:0 8px 32px #0007;text-align:center;min-width:220px;">
-                                            <div style="margin-bottom:30px;font-size:1.5rem;">${message}</div>
-                                            <button id="closeEndPopup" style="padding:10px 30px;font-size:1rem;border:none;border-radius:8px;background:#222;color:#fff;cursor:pointer;">Nouvelle partie</button>
-                                        </div>
-                                    `;
-                                    document.body.appendChild(endPopup);
-                                    document.getElementById('closeEndPopup').addEventListener('click', function() {
-                                        document.body.removeChild(endPopup);
-                                        restartAfterGame();
-                                    });
+                                    const remainingUndercover = joueurs.some(j => j.role === "undercover" && !j.eliminer);
+                                    const mrWhiteAlive = joueurs.some(j => j.role === "mrwhite" && !j.eliminer);
+                                    let message = "L'Undercover a ete demasque. La partie continue.";
+
+                                    if (remainingUndercover) {
+                                        message = "Un Undercover a ete demasque, mais un autre est encore en jeu.";
+                                    } else if (mrWhiteAlive) {
+                                        message = "L'Undercover a ete demasque, mais MrWhite est encore en jeu.";
+                                    }
+
+                                    showResultPopup(message, "#ff9800", joueurs, idx);
                                 } else {
                                     joueurs[idx].eliminer = true;
                                     showResultPopup("L'Undercover se cache encore parmi vous ! Ce joueur est elimine.", "#ff9800", joueurs, idx);
@@ -4225,11 +4219,13 @@
                     else if (civilsAlive === 0 && (undercoverAlive || mrWhiteAlive)) {
                         let message = "";
                         if (undercoverAlive && mrWhiteAlive) {
-                            message = `<b>Victoire de MrWhite et de l'Undercover !</b><br><span style="font-size:1.1rem;">Les rôles spéciaux ont gagné ensemble !</span>`;
+                            openLocalMrWhiteWinnerPopup(true);
+                            return true;
                         } else if (undercoverAlive) {
                             message = `<b>Victoire de l'Undercover !</b><br><span style="font-size:1.1rem;">L'Undercover a su tromper tout le monde !</span>`;
                         } else if (mrWhiteAlive) {
-                            message = `<b>Victoire de MrWhite !</b><br><span style="font-size:1.1rem;">MrWhite a su rester caché jusqu'au bout !</span>`;
+                            openLocalMrWhiteWinnerPopup(false);
+                            return true;
                         }
                         showEndGamePopup(message, "#d32f2f");
                         return true;
@@ -4853,7 +4849,10 @@
         function renderOnlineMrWhiteGuessScreen(view) {
             const guessState = view.mrWhiteGuess;
             const isMrWhiteGuesser = Boolean(guessState?.canGuess);
-            const title = isMrWhiteGuesser ? 'Dechiffre le mot des civils' : 'En attente de MrWhite';
+            const hasMultipleGuessers = Array.isArray(guessState?.playerIds) && guessState.playerIds.length > 1;
+            const title = isMrWhiteGuesser
+                ? 'Dechiffre le mot des civils'
+                : (hasMultipleGuessers ? 'En attente des MrWhite' : 'En attente de MrWhite');
             const description = isMrWhiteGuesser
                 ? 'Tu as une derniere chance : essaie de retrouver le mot des civils.'
                 : `${guessState?.playerName || 'MrWhite'} tente de dechiffrer le mot des civils.`;
