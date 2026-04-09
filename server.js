@@ -102,12 +102,85 @@ function normalizeBooleanSetting(value, fallback) {
     return Boolean(value);
 }
 
-function normalizeSettings(settings = {}, fallback = { players: 5, mrWhite: true, undercover: true }) {
-    const players = Math.min(20, Math.max(3, Number(settings.players) || fallback.players));
+function getMaxSpecialRoleCount(players) {
+    const normalizedPlayers = Math.min(20, Math.max(3, Number(players) || 3));
+    return Math.max(1, Math.floor(normalizedPlayers / 3));
+}
+
+function normalizeRoleCountSetting(value, fallback = 0) {
+    const numericValue = Math.floor(Number(value));
+    if (!Number.isFinite(numericValue) || numericValue < 0) {
+        return fallback;
+    }
+    return numericValue;
+}
+
+function fitSpecialRoleCounts(players, mrWhiteCount, undercoverCount, preferredRole = '') {
+    const maxSpecialRoles = getMaxSpecialRoleCount(players);
+    let nextMrWhiteCount = Math.min(maxSpecialRoles, Math.max(0, normalizeRoleCountSetting(mrWhiteCount, 0)));
+    let nextUndercoverCount = Math.min(maxSpecialRoles, Math.max(0, normalizeRoleCountSetting(undercoverCount, 0)));
+
+    while (nextMrWhiteCount + nextUndercoverCount > maxSpecialRoles) {
+        if ((preferredRole === 'mrWhite' || preferredRole === 'mrWhiteCount') && nextUndercoverCount > 0) {
+            nextUndercoverCount -= 1;
+        } else if ((preferredRole === 'undercover' || preferredRole === 'undercoverCount') && nextMrWhiteCount > 0) {
+            nextMrWhiteCount -= 1;
+        } else if (nextMrWhiteCount >= nextUndercoverCount && nextMrWhiteCount > 0) {
+            nextMrWhiteCount -= 1;
+        } else if (nextUndercoverCount > 0) {
+            nextUndercoverCount -= 1;
+        } else {
+            break;
+        }
+    }
+
+    return {
+        maxSpecialRoles,
+        mrWhiteCount: nextMrWhiteCount,
+        undercoverCount: nextUndercoverCount
+    };
+}
+
+function normalizeSettings(settings = {}, fallback = { players: 6, mrWhiteCount: 1, undercoverCount: 1 }, preferredRole = '') {
+    const fallbackPlayers = Math.min(20, Math.max(3, Number(fallback.players) || 6));
+    const players = Math.min(20, Math.max(3, Number(settings.players) || fallbackPlayers));
+
+    const fallbackMrWhiteCount = normalizeRoleCountSetting(
+        fallback.mrWhiteCount,
+        normalizeBooleanSetting(fallback.mrWhite, true) ? 1 : 0
+    );
+    const fallbackUndercoverCount = normalizeRoleCountSetting(
+        fallback.undercoverCount,
+        normalizeBooleanSetting(fallback.undercover, true) ? 1 : 0
+    );
+
+    const mrWhiteEnabled = normalizeBooleanSetting(
+        settings.mrWhite,
+        settings.mrWhiteCount !== undefined
+            ? normalizeRoleCountSetting(settings.mrWhiteCount, 0) > 0
+            : fallbackMrWhiteCount > 0
+    );
+    const undercoverEnabled = normalizeBooleanSetting(
+        settings.undercover,
+        settings.undercoverCount !== undefined
+            ? normalizeRoleCountSetting(settings.undercoverCount, 0) > 0
+            : fallbackUndercoverCount > 0
+    );
+
+    const fittedCounts = fitSpecialRoleCounts(
+        players,
+        mrWhiteEnabled ? Math.max(1, normalizeRoleCountSetting(settings.mrWhiteCount, Math.max(1, fallbackMrWhiteCount || 1))) : 0,
+        undercoverEnabled ? Math.max(1, normalizeRoleCountSetting(settings.undercoverCount, Math.max(1, fallbackUndercoverCount || 1))) : 0,
+        preferredRole
+    );
+
     return {
         players,
-        mrWhite: normalizeBooleanSetting(settings.mrWhite, fallback.mrWhite),
-        undercover: normalizeBooleanSetting(settings.undercover, fallback.undercover)
+        maxSpecialRoles: fittedCounts.maxSpecialRoles,
+        mrWhiteCount: fittedCounts.mrWhiteCount,
+        undercoverCount: fittedCounts.undercoverCount,
+        mrWhite: fittedCounts.mrWhiteCount > 0,
+        undercover: fittedCounts.undercoverCount > 0
     };
 }
 
@@ -185,17 +258,17 @@ function pickDistinctWords() {
 function buildAssignments(session) {
     const { motCivil, motUndercover } = pickDistinctWords();
     const roles = [];
-    const nbMrWhite = session.settings.mrWhite ? 1 : 0;
-    const nbUndercover = session.settings.undercover ? 1 : 0;
+    const nbMrWhite = Math.max(0, normalizeRoleCountSetting(session.settings.mrWhiteCount, session.settings.mrWhite ? 1 : 0));
+    const nbUndercover = Math.max(0, normalizeRoleCountSetting(session.settings.undercoverCount, session.settings.undercover ? 1 : 0));
     const nbCivils = session.players.length - nbMrWhite - nbUndercover;
 
     for (let i = 0; i < nbCivils; i += 1) {
         roles.push({ role: 'civil', word: motCivil });
     }
-    if (nbUndercover) {
+    for (let i = 0; i < nbUndercover; i += 1) {
         roles.push({ role: 'undercover', word: motUndercover });
     }
-    if (nbMrWhite) {
+    for (let i = 0; i < nbMrWhite; i += 1) {
         roles.push({ role: 'mrwhite', word: null });
     }
 
@@ -352,8 +425,8 @@ function isPlayerAlive(session, playerId) {
 
 function getConfiguredGuessRoles(session) {
     const roles = [];
-    if (session.settings.mrWhite) roles.push('mrwhite');
-    if (session.settings.undercover) roles.push('undercover');
+    if ((session.settings.mrWhiteCount || 0) > 0 || session.settings.mrWhite) roles.push('mrwhite');
+    if ((session.settings.undercoverCount || 0) > 0 || session.settings.undercover) roles.push('undercover');
 
     if (!session.assignments) {
         return roles;
@@ -1127,7 +1200,11 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             return;
         }
 
-        const nextSettings = normalizeSettings(body.settings || {}, session.settings);
+        const nextSettings = normalizeSettings(
+            body.settings || {},
+            session.settings,
+            String(body.preferredRole || '').trim()
+        );
         if (nextSettings.players < session.players.length) {
             sendError(res, 400, 'Le nombre de joueurs ne peut pas etre inferieur au nombre de joueurs deja connectes.');
             return;

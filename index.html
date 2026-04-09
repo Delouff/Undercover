@@ -964,6 +964,10 @@
             margin-top: 16px;
             text-align: left;
         }
+        .waiting-role-count-block {
+            display: grid;
+            gap: 10px;
+        }
         .waiting-toggle {
             display: flex;
             align-items: center;
@@ -978,6 +982,19 @@
             margin: 0;
             accent-color: #ff9800;
             transform: scale(1.1);
+        }
+        .waiting-role-count-editor {
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .waiting-editor-head--compact {
+            margin-bottom: 10px;
+        }
+        .waiting-role-count-note {
+            font-size: 0.9rem;
+            line-height: 1.45;
+            opacity: 0.72;
         }
         .waiting-editor-note {
             margin-top: 14px;
@@ -2235,10 +2252,131 @@
 
         function getDefaultSessionSettings() {
             return {
-                players: 5,
-                mrWhite: true,
-                undercover: true
+                players: 6,
+                mrWhiteCount: 1,
+                undercoverCount: 1
             };
+        }
+
+        function getMaxSpecialRoleCount(players) {
+            const normalizedPlayers = Math.min(20, Math.max(3, Number(players) || 3));
+            return Math.max(1, Math.floor(normalizedPlayers / 3));
+        }
+
+        function normalizeRoleCountSetting(value, fallback = 0) {
+            const numericValue = Math.floor(Number(value));
+            if (!Number.isFinite(numericValue) || numericValue < 0) {
+                return fallback;
+            }
+            return numericValue;
+        }
+
+        function fitSpecialRoleCounts(players, mrWhiteCount, undercoverCount, preferredRole = '') {
+            const maxSpecialRoles = getMaxSpecialRoleCount(players);
+            let nextMrWhiteCount = Math.min(maxSpecialRoles, Math.max(0, normalizeRoleCountSetting(mrWhiteCount, 0)));
+            let nextUndercoverCount = Math.min(maxSpecialRoles, Math.max(0, normalizeRoleCountSetting(undercoverCount, 0)));
+
+            while (nextMrWhiteCount + nextUndercoverCount > maxSpecialRoles) {
+                if ((preferredRole === 'mrWhite' || preferredRole === 'mrWhiteCount') && nextUndercoverCount > 0) {
+                    nextUndercoverCount -= 1;
+                    continue;
+                }
+                if ((preferredRole === 'undercover' || preferredRole === 'undercoverCount') && nextMrWhiteCount > 0) {
+                    nextMrWhiteCount -= 1;
+                    continue;
+                }
+
+                if (nextMrWhiteCount >= nextUndercoverCount && nextMrWhiteCount > 0) {
+                    nextMrWhiteCount -= 1;
+                } else if (nextUndercoverCount > 0) {
+                    nextUndercoverCount -= 1;
+                } else {
+                    break;
+                }
+            }
+
+            return {
+                maxSpecialRoles,
+                mrWhiteCount: nextMrWhiteCount,
+                undercoverCount: nextUndercoverCount
+            };
+        }
+
+        function formatRoleCountLabel(count) {
+            return `${count} joueur${count > 1 ? 's' : ''}`;
+        }
+
+        function renderSpecialRoleCountEditor(scope, roleKey, label, settings) {
+            const isMrWhite = roleKey === 'mrWhite';
+            const countKey = isMrWhite ? 'mrWhiteCount' : 'undercoverCount';
+            const otherCountKey = isMrWhite ? 'undercoverCount' : 'mrWhiteCount';
+            const suffix = isMrWhite ? 'MrWhite' : 'Undercover';
+            const count = Math.max(0, settings[countKey] || 0);
+            const otherCount = Math.max(0, settings[otherCountKey] || 0);
+            const enabled = count > 0;
+            const maxSpecialRoles = settings.maxSpecialRoles || getMaxSpecialRoleCount(settings.players);
+            const maxForRole = enabled ? Math.max(1, maxSpecialRoles - otherCount) : maxSpecialRoles;
+            const showSlider = enabled && settings.players >= 6 && maxForRole >= 2;
+
+            return `
+                <div class="waiting-role-count-block">
+                    <label class="waiting-toggle">
+                        <input id="${scope}${suffix}Checkbox" type="checkbox" ${enabled ? 'checked' : ''}>
+                        <span>${label}</span>
+                    </label>
+                    ${enabled ? `
+                        <div class="waiting-role-count-editor">
+                            <div class="waiting-editor-head waiting-editor-head--compact">
+                                <label class="waiting-editor-label" for="${scope}${suffix}CountRange">Quantite</label>
+                                <div class="waiting-editor-value"><span id="${scope}${suffix}CountValue" data-count="${count}">${formatRoleCountLabel(count)}</span></div>
+                            </div>
+                            ${showSlider ? `
+                                <input id="${scope}${suffix}CountRange" class="waiting-range" type="range" min="1" max="${maxForRole}" value="${Math.min(count, maxForRole)}">
+                                <div class="waiting-range-scale">
+                                    <span>1</span>
+                                    <span>${maxForRole}</span>
+                                </div>
+                            ` : `
+                                <div class="waiting-role-count-note">Maximum 1 joueur pour ce role dans cette configuration.</div>
+                            `}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function readSettingsCountFromControls(scope, suffix, enabled) {
+            if (!enabled) return 0;
+
+            const rangeInput = document.getElementById(`${scope}${suffix}CountRange`);
+            if (rangeInput) {
+                return Math.max(1, parseInt(rangeInput.value, 10) || 1);
+            }
+
+            const valueTag = document.getElementById(`${scope}${suffix}CountValue`);
+            if (valueTag && valueTag.dataset && valueTag.dataset.count) {
+                return Math.max(1, parseInt(valueTag.dataset.count, 10) || 1);
+            }
+
+            return 1;
+        }
+
+        function collectSettingsFromControls(scope, fallbackSettings = getDefaultSessionSettings(), preferredRole = '') {
+            const rangeInput = document.getElementById(`${scope}PlayersRange`);
+            const mrWhiteCheckbox = document.getElementById(`${scope}MrWhiteCheckbox`);
+            const undercoverCheckbox = document.getElementById(`${scope}UndercoverCheckbox`);
+            const fallbackMrWhiteEnabled = Boolean(fallbackSettings.mrWhite) || (Number(fallbackSettings.mrWhiteCount) || 0) > 0;
+            const fallbackUndercoverEnabled = Boolean(fallbackSettings.undercover) || (Number(fallbackSettings.undercoverCount) || 0) > 0;
+            const mrWhiteEnabled = mrWhiteCheckbox ? mrWhiteCheckbox.checked : fallbackMrWhiteEnabled;
+            const undercoverEnabled = undercoverCheckbox ? undercoverCheckbox.checked : fallbackUndercoverEnabled;
+
+            return normalizeSessionSettings({
+                players: rangeInput ? parseInt(rangeInput.value, 10) : fallbackSettings.players,
+                mrWhite: mrWhiteEnabled,
+                undercover: undercoverEnabled,
+                mrWhiteCount: readSettingsCountFromControls(scope, 'MrWhite', mrWhiteEnabled),
+                undercoverCount: readSettingsCountFromControls(scope, 'Undercover', undercoverEnabled)
+            }, preferredRole);
         }
 
         function createSessionCode() {
@@ -2284,16 +2422,10 @@
                         <span>20</span>
                     </div>
                     <div class="waiting-toggle-list">
-                        <label class="waiting-toggle">
-                            <input id="localMrWhiteCheckbox" type="checkbox" ${settings.mrWhite ? 'checked' : ''}>
-                            <span>Activer Mr. White</span>
-                        </label>
-                        <label class="waiting-toggle">
-                            <input id="localUndercoverCheckbox" type="checkbox" ${settings.undercover ? 'checked' : ''}>
-                            <span>Activer Undercover</span>
-                        </label>
+                        ${renderSpecialRoleCountEditor('local', 'mrWhite', 'Activer Mr. White', settings)}
+                        ${renderSpecialRoleCountEditor('local', 'undercover', 'Activer Undercover', settings)}
                     </div>
-                    <div class="waiting-editor-note">Ces reglages s'appliquent directement a la prochaine manche locale.</div>
+                    <div class="waiting-editor-note">Maximum ${settings.maxSpecialRoles} role${settings.maxSpecialRoles > 1 ? 's' : ''} special${settings.maxSpecialRoles > 1 ? 's' : ''} pour ${settings.players} joueurs. Ces reglages s'appliquent directement a la prochaine manche locale.</div>
                 </div>
             `;
         }
@@ -2314,14 +2446,45 @@
             return Boolean(value);
         }
 
-        function normalizeSessionSettings(settings = {}) {
+        function normalizeSessionSettings(settings = {}, preferredRole = '') {
             const defaultSettings = getDefaultSessionSettings();
             const players = Math.min(20, Math.max(3, Number(settings.players) || defaultSettings.players));
+            const fallbackMrWhiteCount = normalizeRoleCountSetting(
+                defaultSettings.mrWhiteCount,
+                normalizeBooleanSetting(defaultSettings.mrWhite, true) ? 1 : 0
+            );
+            const fallbackUndercoverCount = normalizeRoleCountSetting(
+                defaultSettings.undercoverCount,
+                normalizeBooleanSetting(defaultSettings.undercover, true) ? 1 : 0
+            );
+
+            const mrWhiteEnabled = normalizeBooleanSetting(
+                settings.mrWhite,
+                settings.mrWhiteCount !== undefined
+                    ? normalizeRoleCountSetting(settings.mrWhiteCount, 0) > 0
+                    : fallbackMrWhiteCount > 0
+            );
+            const undercoverEnabled = normalizeBooleanSetting(
+                settings.undercover,
+                settings.undercoverCount !== undefined
+                    ? normalizeRoleCountSetting(settings.undercoverCount, 0) > 0
+                    : fallbackUndercoverCount > 0
+            );
+
+            const fittedCounts = fitSpecialRoleCounts(
+                players,
+                mrWhiteEnabled ? Math.max(1, normalizeRoleCountSetting(settings.mrWhiteCount, Math.max(1, fallbackMrWhiteCount || 1))) : 0,
+                undercoverEnabled ? Math.max(1, normalizeRoleCountSetting(settings.undercoverCount, Math.max(1, fallbackUndercoverCount || 1))) : 0,
+                preferredRole
+            );
 
             return {
                 players: players,
-                mrWhite: normalizeBooleanSetting(settings.mrWhite, defaultSettings.mrWhite),
-                undercover: normalizeBooleanSetting(settings.undercover, defaultSettings.undercover)
+                maxSpecialRoles: fittedCounts.maxSpecialRoles,
+                mrWhiteCount: fittedCounts.mrWhiteCount,
+                undercoverCount: fittedCounts.undercoverCount,
+                mrWhite: fittedCounts.mrWhiteCount > 0,
+                undercover: fittedCounts.undercoverCount > 0
             };
         }
 
@@ -2330,7 +2493,9 @@
             return normalizeSessionSettings({
                 players: params.get('players'),
                 mrWhite: params.get('mrWhite'),
-                undercover: params.get('undercover')
+                undercover: params.get('undercover'),
+                mrWhiteCount: params.get('mrWhiteCount'),
+                undercoverCount: params.get('undercoverCount')
             });
         }
 
@@ -2349,16 +2514,10 @@
                             <span>20</span>
                         </div>
                         <div class="waiting-toggle-list">
-                            <label class="waiting-toggle">
-                                <input id="sessionMrWhiteCheckbox" type="checkbox" ${settings.mrWhite ? 'checked' : ''}>
-                                <span>Activer Mr. White</span>
-                            </label>
-                            <label class="waiting-toggle">
-                                <input id="sessionUndercoverCheckbox" type="checkbox" ${settings.undercover ? 'checked' : ''}>
-                                <span>Activer Undercover</span>
-                            </label>
+                            ${renderSpecialRoleCountEditor('session', 'mrWhite', 'Activer Mr. White', settings)}
+                            ${renderSpecialRoleCountEditor('session', 'undercover', 'Activer Undercover', settings)}
                         </div>
-                        <div class="waiting-editor-note">Les changements sont appliques directement a cette session.</div>
+                        <div class="waiting-editor-note">Maximum ${settings.maxSpecialRoles} role${settings.maxSpecialRoles > 1 ? 's' : ''} special${settings.maxSpecialRoles > 1 ? 's' : ''} pour ${settings.players} joueurs. Les changements sont appliques directement a cette session.</div>
                     </div>
                 `;
             }
@@ -2373,14 +2532,14 @@
                         </div>
                         <div class="waiting-setting-box">
                             <div class="waiting-setting-label">Mr. White</div>
-                            <div class="waiting-setting-value">${settings.mrWhite ? 'Actif' : 'Desactive'}</div>
+                            <div class="waiting-setting-value">${settings.mrWhiteCount > 0 ? formatRoleCountLabel(settings.mrWhiteCount) : 'Desactive'}</div>
                         </div>
                         <div class="waiting-setting-box">
                             <div class="waiting-setting-label">Undercover</div>
-                            <div class="waiting-setting-value">${settings.undercover ? 'Actif' : 'Desactive'}</div>
+                            <div class="waiting-setting-value">${settings.undercoverCount > 0 ? formatRoleCountLabel(settings.undercoverCount) : 'Desactive'}</div>
                         </div>
                     </div>
-                    <div class="waiting-editor-note">Lecture seule pour les invites.</div>
+                    <div class="waiting-editor-note">Lecture seule pour les invites. Maximum actuel : ${settings.maxSpecialRoles} role${settings.maxSpecialRoles > 1 ? 's' : ''} special${settings.maxSpecialRoles > 1 ? 's' : ''}.</div>
                 </div>
             `;
         }
@@ -2588,6 +2747,8 @@
             url.searchParams.set('players', String(settings.players));
             url.searchParams.set('mrWhite', settings.mrWhite ? '1' : '0');
             url.searchParams.set('undercover', settings.undercover ? '1' : '0');
+            url.searchParams.set('mrWhiteCount', String(settings.mrWhiteCount || 0));
+            url.searchParams.set('undercoverCount', String(settings.undercoverCount || 0));
             return url.toString();
         }
 
@@ -3352,6 +3513,10 @@
             const autoPseudosQueue = Array.isArray(options.autoPseudosQueue)
                 ? [...options.autoPseudosQueue]
                 : null;
+            const nbMrWhite = Math.max(0, normalizeRoleCountSetting(mrWhite, mrWhite ? 1 : 0));
+            const nbUndercover = Math.max(0, normalizeRoleCountSetting(undercover, undercover ? 1 : 0));
+            const mrWhiteEnabled = nbMrWhite > 0;
+            const undercoverEnabled = nbUndercover > 0;
             const motsFrancais = [
                 "chat", "chien", "maison", "voiture", "pain", "eau", "livre", "arbre", "soleil", "lune",
                 "porte", "table", "fleur", "route", "montagne", "mer", "pomme", "banane", "fromage", "clé",
@@ -3429,13 +3594,11 @@
             }
 
             let roles = [];
-            let nbMrWhite = mrWhite ? 1 : 0;
-            let nbUndercover = undercover ? 1 : 0;
             let nbCivils = nbJoueurs - nbMrWhite - nbUndercover;
 
             for(let i=0; i<nbCivils; i++) roles.push({role: "civil", mot: motCivil});
-            if(nbUndercover) roles.push({role: "undercover", mot: motUndercover});
-            if(nbMrWhite) roles.push({role: "mrwhite", mot: null});
+            for(let i=0; i<nbUndercover; i++) roles.push({role: "undercover", mot: motUndercover});
+            for(let i=0; i<nbMrWhite; i++) roles.push({role: "mrwhite", mot: null});
             roles = roles.sort(() => Math.random() - 0.5);
 
             let cardsHtml = `
@@ -3626,7 +3789,7 @@
 
                                 btn.addEventListener('click', function() {
                                     prepareLocalRound(-1);
-                                    showGameScreen(joueurs, mrWhite, undercover);
+                                    showGameScreen(joueurs, mrWhiteEnabled, undercoverEnabled);
                                 });
                             }
                         }
@@ -3665,12 +3828,12 @@
                 turnState.lastSubmittedIndex = null;
             }
 
-            function beginNextLocalRound(startIndex = -1, mrWhiteActive = mrWhite, undercoverActive = undercover) {
+            function beginNextLocalRound(startIndex = -1, mrWhiteActive = mrWhiteEnabled, undercoverActive = undercoverEnabled) {
                 prepareLocalRound(startIndex);
                 showGameScreen(joueurs, mrWhiteActive, undercoverActive);
             }
 
-            function showGameScreen(joueurs, mrWhiteActive = mrWhite, undercoverActive = undercover) {
+            function showGameScreen(joueurs, mrWhiteActive = mrWhiteEnabled, undercoverActive = undercoverEnabled) {
                 joueurs.forEach(j => {
                     if (j.eliminer === undefined) j.eliminer = false;
                     if (j.hasSpokenThisRound === undefined) j.hasSpokenThisRound = false;
@@ -4240,49 +4403,43 @@
 
             if (isHost) {
                 const rangeInput = document.getElementById('sessionPlayersRange');
-                const playersValue = document.getElementById('sessionPlayersValue');
                 const mrWhiteCheckbox = document.getElementById('sessionMrWhiteCheckbox');
                 const undercoverCheckbox = document.getElementById('sessionUndercoverCheckbox');
+                const mrWhiteCountRange = document.getElementById('sessionMrWhiteCountRange');
+                const undercoverCountRange = document.getElementById('sessionUndercoverCountRange');
 
-                function updateSessionSettings(partialSettings) {
-                    sessionState.settings = normalizeSessionSettings({
-                        ...sessionState.settings,
-                        ...partialSettings
+                function rerenderSessionSettings(preferredRole = '') {
+                    sessionState.settings = collectSettingsFromControls('session', sessionState.settings, preferredRole);
+                    showWaitingRoomScreen(code, {
+                        isHost: sessionState.isHost,
+                        settings: sessionState.settings,
+                        playerName: sessionState.playerName
                     });
-
-                    if (playersValue) {
-                        playersValue.textContent = sessionState.settings.players;
-                    }
-                    if (rangeInput && Number(rangeInput.value) !== sessionState.settings.players) {
-                        rangeInput.value = String(sessionState.settings.players);
-                    }
-                    if (mrWhiteCheckbox) {
-                        mrWhiteCheckbox.checked = sessionState.settings.mrWhite;
-                    }
-                    if (undercoverCheckbox) {
-                        undercoverCheckbox.checked = sessionState.settings.undercover;
-                    }
                 }
 
                 rangeInput.addEventListener('input', function() {
-                    updateSessionSettings({
-                        players: parseInt(this.value, 10)
-                    });
+                    rerenderSessionSettings('players');
                 });
                 mrWhiteCheckbox.addEventListener('change', function() {
-                    updateSessionSettings({
-                        mrWhite: this.checked
-                    });
+                    rerenderSessionSettings('mrWhite');
                 });
                 undercoverCheckbox.addEventListener('change', function() {
-                    updateSessionSettings({
-                        undercover: this.checked
-                    });
+                    rerenderSessionSettings('undercover');
                 });
+                if (mrWhiteCountRange) {
+                    mrWhiteCountRange.addEventListener('input', function() {
+                        rerenderSessionSettings('mrWhiteCount');
+                    });
+                }
+                if (undercoverCountRange) {
+                    undercoverCountRange.addEventListener('input', function() {
+                        rerenderSessionSettings('undercoverCount');
+                    });
+                }
 
                 document.getElementById('launchSessionBtn').addEventListener('click', function() {
                     const currentSettings = normalizeSessionSettings(sessionState.settings);
-                    showCardsScreen(currentSettings.players, currentSettings.mrWhite, currentSettings.undercover, {
+                    showCardsScreen(currentSettings.players, currentSettings.mrWhiteCount, currentSettings.undercoverCount, {
                         autoPseudosQueue: createSessionAutoPseudos(currentSettings.players, sessionState.playerName),
                         source: 'session'
                     });
@@ -4541,34 +4698,18 @@
                 const playersValue = document.getElementById('sessionPlayersValue');
                 const mrWhiteCheckbox = document.getElementById('sessionMrWhiteCheckbox');
                 const undercoverCheckbox = document.getElementById('sessionUndercoverCheckbox');
+                const mrWhiteCountRange = document.getElementById('sessionMrWhiteCountRange');
+                const undercoverCountRange = document.getElementById('sessionUndercoverCountRange');
 
                 rangeInput.addEventListener('input', function() {
                     playersValue.textContent = this.value;
                 });
-                rangeInput.addEventListener('change', async function() {
-                    try {
-                        await performOnlineAction('/api/session/settings', {
-                            settings: {
-                                players: parseInt(this.value, 10),
-                                mrWhite: mrWhiteCheckbox.checked,
-                                undercover: undercoverCheckbox.checked
-                            }
-                        });
-                        await refreshOnlineSession(true);
-                    } catch (error) {
-                        showInfoDialog('Parametres invalides', escapeHtml(error.message));
-                        await refreshOnlineSession(true);
-                    }
-                });
 
-                async function submitRoleSettings() {
+                async function submitRoleSettings(preferredRole = '') {
                     try {
                         await performOnlineAction('/api/session/settings', {
-                            settings: {
-                                players: parseInt(rangeInput.value, 10),
-                                mrWhite: mrWhiteCheckbox.checked,
-                                undercover: undercoverCheckbox.checked
-                            }
+                            settings: collectSettingsFromControls('session', view.settings, preferredRole),
+                            preferredRole
                         });
                         await refreshOnlineSession(true);
                     } catch (error) {
@@ -4577,8 +4718,39 @@
                     }
                 }
 
-                mrWhiteCheckbox.addEventListener('change', submitRoleSettings);
-                undercoverCheckbox.addEventListener('change', submitRoleSettings);
+                rangeInput.addEventListener('change', function() {
+                    submitRoleSettings('players');
+                });
+                mrWhiteCheckbox.addEventListener('change', function() {
+                    submitRoleSettings('mrWhite');
+                });
+                undercoverCheckbox.addEventListener('change', function() {
+                    submitRoleSettings('undercover');
+                });
+                if (mrWhiteCountRange) {
+                    mrWhiteCountRange.addEventListener('input', function() {
+                        const valueTag = document.getElementById('sessionMrWhiteCountValue');
+                        if (valueTag) {
+                            valueTag.dataset.count = this.value;
+                            valueTag.textContent = formatRoleCountLabel(parseInt(this.value, 10) || 1);
+                        }
+                    });
+                    mrWhiteCountRange.addEventListener('change', function() {
+                        submitRoleSettings('mrWhiteCount');
+                    });
+                }
+                if (undercoverCountRange) {
+                    undercoverCountRange.addEventListener('input', function() {
+                        const valueTag = document.getElementById('sessionUndercoverCountValue');
+                        if (valueTag) {
+                            valueTag.dataset.count = this.value;
+                            valueTag.textContent = formatRoleCountLabel(parseInt(this.value, 10) || 1);
+                        }
+                    });
+                    undercoverCountRange.addEventListener('change', function() {
+                        submitRoleSettings('undercoverCount');
+                    });
+                }
 
                 const launchBtn = document.getElementById('launchOnlineGameBtn');
                 if (launchBtn) {
@@ -5569,42 +5741,38 @@
             `;
 
             const rangeInput = document.getElementById('localPlayersRange');
-            const playersValue = document.getElementById('localPlayersValue');
             const mrWhiteCheckbox = document.getElementById('localMrWhiteCheckbox');
             const undercoverCheckbox = document.getElementById('localUndercoverCheckbox');
+            const mrWhiteCountRange = document.getElementById('localMrWhiteCountRange');
+            const undercoverCountRange = document.getElementById('localUndercoverCountRange');
 
-            function updateLocalSettings(partialSettings) {
-                localGameSettings = normalizeSessionSettings({
-                    ...localGameSettings,
-                    ...partialSettings
-                });
-
-                playersValue.textContent = localGameSettings.players;
-                if (Number(rangeInput.value) !== localGameSettings.players) {
-                    rangeInput.value = String(localGameSettings.players);
-                }
-                mrWhiteCheckbox.checked = localGameSettings.mrWhite;
-                undercoverCheckbox.checked = localGameSettings.undercover;
+            function rerenderLocalSettings(preferredRole = '') {
+                const nextSettings = collectSettingsFromControls('local', localGameSettings, preferredRole);
+                showLocalSetupScreen(nextSettings);
             }
 
             rangeInput.addEventListener('input', function() {
-                updateLocalSettings({
-                    players: parseInt(this.value, 10)
-                });
+                rerenderLocalSettings('players');
             });
             mrWhiteCheckbox.addEventListener('change', function() {
-                updateLocalSettings({
-                    mrWhite: this.checked
-                });
+                rerenderLocalSettings('mrWhite');
             });
             undercoverCheckbox.addEventListener('change', function() {
-                updateLocalSettings({
-                    undercover: this.checked
-                });
+                rerenderLocalSettings('undercover');
             });
+            if (mrWhiteCountRange) {
+                mrWhiteCountRange.addEventListener('input', function() {
+                    rerenderLocalSettings('mrWhiteCount');
+                });
+            }
+            if (undercoverCountRange) {
+                undercoverCountRange.addEventListener('input', function() {
+                    rerenderLocalSettings('undercoverCount');
+                });
+            }
 
             document.getElementById('launchLocalGameBtn').addEventListener('click', function() {
-                showCardsScreen(localGameSettings.players, localGameSettings.mrWhite, localGameSettings.undercover, {
+                showCardsScreen(localGameSettings.players, localGameSettings.mrWhiteCount, localGameSettings.undercoverCount, {
                     source: 'local'
                 });
             });
