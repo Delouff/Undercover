@@ -1583,7 +1583,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
     sendError(res, 404, 'Route API introuvable.');
 }
 
-const server = http.createServer(async (req, res) => {
+async function requestHandler(req, res) {
     try {
         const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
@@ -1602,25 +1602,30 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
         sendError(res, 500, error.message || 'Une erreur serveur est survenue.');
     }
-});
+}
 
-server.listen(PORT, HOST, () => {
-    const interfaces = os.networkInterfaces();
-    const urls = [];
+module.exports = requestHandler;
 
-    Object.values(interfaces).forEach((entries) => {
-        (entries || []).forEach((entry) => {
-            if (entry && entry.family === 'IPv4' && !entry.internal) {
-                urls.push(`http://${entry.address}:${PORT}`);
-            }
+if (require.main === module) {
+    const server = http.createServer(requestHandler);
+    server.listen(PORT, HOST, () => {
+        const interfaces = os.networkInterfaces();
+        const urls = [];
+
+        Object.values(interfaces).forEach((entries) => {
+            (entries || []).forEach((entry) => {
+                if (entry && entry.family === 'IPv4' && !entry.internal) {
+                    urls.push(`http://${entry.address}:${PORT}`);
+                }
+            });
         });
-    });
 
-    console.log(`Serveur Undercover lance sur http://localhost:${PORT}`);
-    if (urls.length) {
-        console.log('Accessible sur le reseau local :');
-        urls.forEach((url) => console.log(`- ${url}`));
-    } else {
-        console.log("Aucune IP reseau locale n'a ete detectee.");
-    }
-});
+        console.log(`Serveur Undercover lance sur http://localhost:${PORT}`);
+        if (urls.length) {
+            console.log('Accessible sur le reseau local :');
+            urls.forEach((url) => console.log(`- ${url}`));
+        } else {
+            console.log("Aucune IP reseau locale n'a ete detectee.");
+        }
+    });
+}
