@@ -2953,7 +2953,7 @@
             try {
                 response = await fetch(path, requestOptions);
             } catch (error) {
-                throw new Error("Impossible de contacter le serveur local. Lance d'abord node server.js.");
+                throw new Error("Impossible de contacter le serveur multijoueur. Verifie que le backend est bien disponible.");
             }
 
             const text = await response.text();

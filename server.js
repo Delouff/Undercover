@@ -26,6 +26,15 @@ const motPairs = require('./word-pairs.js');
 const sessions = new Map();
 const closedSessions = new Map();
 const CLOSED_SESSION_TTL_MS = 10 * 60 * 1000;
+const SESSION_TTL_SECONDS = 24 * 60 * 60;
+const SESSION_LOCK_TTL_SECONDS = 8;
+const SESSION_LOCK_RETRY_COUNT = 20;
+const SESSION_LOCK_RETRY_DELAY_MS = 120;
+const STORAGE_PREFIX = 'undercover';
+const REDIS_REST_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
+const REDIS_REST_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+const SHARED_STORAGE_ENABLED = Boolean(REDIS_REST_URL && REDIS_REST_TOKEN);
+const VERCEL_RUNTIME = Boolean(process.env.VERCEL);
 
 function sendJson(res, statusCode, payload) {
     const body = JSON.stringify(payload);
@@ -41,6 +50,10 @@ function sendError(res, statusCode, message) {
 }
 
 function pruneClosedSessions() {
+    if (SHARED_STORAGE_ENABLED) {
+        return;
+    }
+
     const now = Date.now();
     for (const [code, entry] of closedSessions.entries()) {
         if (!entry || entry.expiresAt <= now) {
@@ -49,9 +62,123 @@ function pruneClosedSessions() {
     }
 }
 
-function rememberClosedSession(code, message) {
+function normalizeSessionCode(value) {
+    return String(value || '').trim().toUpperCase();
+}
+
+function getSessionStorageKey(code) {
+    return `${STORAGE_PREFIX}:session:${normalizeSessionCode(code)}`;
+}
+
+function getClosedSessionStorageKey(code) {
+    return `${STORAGE_PREFIX}:closed:${normalizeSessionCode(code)}`;
+}
+
+function getSessionLockKey(code) {
+    return `${STORAGE_PREFIX}:lock:${normalizeSessionCode(code)}`;
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function ensureStorageReady() {
+    if (SHARED_STORAGE_ENABLED || !VERCEL_RUNTIME) {
+        return true;
+    }
+
+    throw new Error("Le multijoueur sur Vercel a besoin d'un stockage partage Upstash Redis. Ajoute l'integration depuis le Marketplace Vercel pour activer les sessions.");
+}
+
+async function redisCommand(command) {
+    const response = await fetch(REDIS_REST_URL, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${REDIS_REST_TOKEN}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(command)
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.error) {
+        throw new Error(payload.error || 'Impossible de contacter le stockage partage.');
+    }
+
+    return payload.result;
+}
+
+function serializeSession(session) {
+    return JSON.stringify({
+        ...session,
+        code: normalizeSessionCode(session.code),
+        secretAcknowledged: [...(session.secretAcknowledged || new Set())]
+    });
+}
+
+function deserializeSession(serializedSession) {
+    if (!serializedSession) {
+        return null;
+    }
+
+    const parsed = typeof serializedSession === 'string'
+        ? JSON.parse(serializedSession)
+        : serializedSession;
+
+    return {
+        ...parsed,
+        code: normalizeSessionCode(parsed.code),
+        players: Array.isArray(parsed.players) ? parsed.players : [],
+        alivePlayerIds: Array.isArray(parsed.alivePlayerIds) ? parsed.alivePlayerIds : [],
+        clues: Array.isArray(parsed.clues) ? parsed.clues : [],
+        clueHistory: Array.isArray(parsed.clueHistory) ? parsed.clueHistory : [],
+        discussionMessages: Array.isArray(parsed.discussionMessages) ? parsed.discussionMessages : [],
+        turnOrderPlayerIds: Array.isArray(parsed.turnOrderPlayerIds) ? parsed.turnOrderPlayerIds : null,
+        votes: parsed.votes && typeof parsed.votes === 'object' ? parsed.votes : {},
+        secretAcknowledged: new Set(Array.isArray(parsed.secretAcknowledged) ? parsed.secretAcknowledged : [])
+    };
+}
+
+async function saveSession(session) {
+    const normalizedCode = normalizeSessionCode(session.code);
+    session.code = normalizedCode;
+
+    if (!SHARED_STORAGE_ENABLED) {
+        sessions.set(normalizedCode, session);
+        return;
+    }
+
+    await redisCommand(['SET', getSessionStorageKey(normalizedCode), serializeSession(session), 'EX', SESSION_TTL_SECONDS]);
+}
+
+async function deleteSessionStorage(code) {
+    const normalizedCode = normalizeSessionCode(code);
+    if (!normalizedCode) {
+        return;
+    }
+
+    if (!SHARED_STORAGE_ENABLED) {
+        sessions.delete(normalizedCode);
+        return;
+    }
+
+    await redisCommand(['DEL', getSessionStorageKey(normalizedCode)]);
+}
+
+async function rememberClosedSession(code, message) {
     const normalizedCode = String(code || '').trim().toUpperCase();
     if (!normalizedCode || !message) {
+        return;
+    }
+
+    if (SHARED_STORAGE_ENABLED) {
+        await redisCommand([
+            'SET',
+            getClosedSessionStorageKey(normalizedCode),
+            JSON.stringify({ message }),
+            'PX',
+            CLOSED_SESSION_TTL_MS
+        ]);
         return;
     }
 
@@ -62,24 +189,97 @@ function rememberClosedSession(code, message) {
     });
 }
 
-function getClosedSessionMessage(code) {
-    const normalizedCode = String(code || '').trim().toUpperCase();
+async function getClosedSessionMessage(code) {
+    const normalizedCode = normalizeSessionCode(code);
     if (!normalizedCode) {
         return '';
+    }
+
+    if (SHARED_STORAGE_ENABLED) {
+        const serializedEntry = await redisCommand(['GET', getClosedSessionStorageKey(normalizedCode)]);
+        if (!serializedEntry) {
+            return '';
+        }
+
+        try {
+            return JSON.parse(serializedEntry)?.message || '';
+        } catch (error) {
+            return '';
+        }
     }
 
     pruneClosedSessions();
     return closedSessions.get(normalizedCode)?.message || '';
 }
 
-function sendMissingSessionError(res, code) {
-    const closedMessage = getClosedSessionMessage(code);
+async function loadSession(code) {
+    const normalizedCode = normalizeSessionCode(code);
+    if (!normalizedCode) {
+        return null;
+    }
+
+    if (!SHARED_STORAGE_ENABLED) {
+        return sessions.get(normalizedCode) || null;
+    }
+
+    const serializedSession = await redisCommand(['GET', getSessionStorageKey(normalizedCode)]);
+    return deserializeSession(serializedSession);
+}
+
+async function ensureSession(sessionCode) {
+    return loadSession(sessionCode);
+}
+
+async function sendMissingSessionError(res, code) {
+    const closedMessage = await getClosedSessionMessage(code);
     if (closedMessage) {
         sendError(res, 410, closedMessage);
         return;
     }
 
     sendError(res, 404, 'Cette session est introuvable.');
+}
+
+async function acquireSessionLock(code) {
+    const normalizedCode = normalizeSessionCode(code);
+    if (!normalizedCode || !SHARED_STORAGE_ENABLED) {
+        return async () => {};
+    }
+
+    const lockKey = getSessionLockKey(normalizedCode);
+    const token = crypto.randomUUID();
+
+    for (let attempt = 0; attempt < SESSION_LOCK_RETRY_COUNT; attempt += 1) {
+        const result = await redisCommand(['SET', lockKey, token, 'NX', 'EX', SESSION_LOCK_TTL_SECONDS]);
+        if (result === 'OK') {
+            return async () => {
+                try {
+                    await redisCommand([
+                        'EVAL',
+                        'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end',
+                        1,
+                        lockKey,
+                        token
+                    ]);
+                } catch (error) {
+                    // Ignore unlock failures: the short TTL prevents permanent lock issues.
+                }
+            };
+        }
+
+        await sleep(SESSION_LOCK_RETRY_DELAY_MS);
+    }
+
+    throw new Error('La session est occupee. Reessaie dans un instant.');
+}
+
+async function withSessionLock(code, callback) {
+    const release = await acquireSessionLock(code);
+    try {
+        return await callback();
+    } finally {
+        await release();
+    }
 }
 
 function normalizePlayerName(value) {
@@ -209,12 +409,12 @@ function normalizeVoteRole(value) {
     return role === 'mrwhite' || role === 'undercover' ? role : '';
 }
 
-function randomCode() {
+async function randomCode() {
     let code = '';
     do {
         pruneClosedSessions();
         code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    } while (sessions.has(code) || closedSessions.has(code));
+    } while ((await loadSession(code)) || (await getClosedSessionMessage(code)));
     return code;
 }
 
@@ -310,7 +510,6 @@ function removePlayerFromSession(session, playerId) {
     });
 
     if (session.players.length === 0) {
-        sessions.delete(session.code);
         return {
             removed: true,
             deleted: true,
@@ -320,8 +519,6 @@ function removePlayerFromSession(session, playerId) {
 
     if (session.hostPlayerId === playerId) {
         const hostEscapeMessage = "L'hote s'est enfui.";
-        sessions.delete(session.code);
-        rememberClosedSession(session.code, hostEscapeMessage);
         return {
             removed: true,
             deleted: true,
@@ -370,7 +567,6 @@ function removePlayerFromSession(session, playerId) {
     } else if (session.status === 'clues') {
         const alivePlayers = getAlivePlayers(session);
         if (alivePlayers.length === 0) {
-            sessions.delete(session.code);
             return {
                 removed: true,
                 deleted: true,
@@ -400,10 +596,6 @@ function removePlayerFromSession(session, playerId) {
         deleted: false,
         removedPlayer
     };
-}
-
-function ensureSession(sessionCode) {
-    return sessions.get(String(sessionCode || '').trim().toUpperCase());
 }
 
 function ensurePlayer(session, playerId) {
@@ -1012,6 +1204,13 @@ function serveStaticFile(req, res, pathname) {
 }
 
 async function handleApiRequest(req, res, pathname, searchParams) {
+    try {
+        ensureStorageReady();
+    } catch (error) {
+        sendError(res, 503, error.message || 'Le stockage partage du multijoueur n est pas configure.');
+        return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/session/create') {
         const body = await readJsonBody(req);
         const playerName = normalizePlayerName(body.playerName);
@@ -1020,7 +1219,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             return;
         }
 
-        const code = randomCode();
+        const code = await randomCode();
         const hostPlayerId = randomPlayerId();
         const settings = normalizeSettings(body.settings || {});
         const session = {
@@ -1048,7 +1247,7 @@ async function handleApiRequest(req, res, pathname, searchParams) {
             updatedAt: Date.now()
         };
 
-        sessions.set(code, session);
+        await saveSession(session);
         sendJson(res, 201, {
             code,
             playerId: hostPlayerId,
@@ -1062,54 +1261,57 @@ async function handleApiRequest(req, res, pathname, searchParams) {
         const code = String(body.code || '').trim().toUpperCase();
         const playerName = normalizePlayerName(body.playerName);
         const requestedPlayerId = String(body.playerId || '').trim();
-        const session = ensureSession(code);
+        await withSessionLock(code, async () => {
+            const session = await ensureSession(code);
 
-        if (!session) {
-            sendMissingSessionError(res, code);
-            return;
-        }
-
-        if (requestedPlayerId) {
-            const existingById = ensurePlayer(session, requestedPlayerId);
-            if (existingById) {
-                sendJson(res, 200, {
-                    code,
-                    playerId: existingById.id,
-                    playerName: existingById.name
-                });
+            if (!session) {
+                await sendMissingSessionError(res, code);
                 return;
             }
-        }
 
-        if (session.status !== 'waiting') {
-            sendError(res, 400, 'La partie a deja commence.');
-            return;
-        }
+            if (requestedPlayerId) {
+                const existingById = ensurePlayer(session, requestedPlayerId);
+                if (existingById) {
+                    sendJson(res, 200, {
+                        code,
+                        playerId: existingById.id,
+                        playerName: existingById.name
+                    });
+                    return;
+                }
+            }
 
-        if (!playerName) {
-            sendError(res, 400, 'Entre un pseudo avant de rejoindre la session.');
-            return;
-        }
+            if (session.status !== 'waiting') {
+                sendError(res, 400, 'La partie a deja commence.');
+                return;
+            }
 
-        const existingByName = session.players.find((entry) => entry.name.toLowerCase() === playerName.toLowerCase());
-        if (existingByName) {
-            sendError(res, 400, 'Ce pseudo est deja utilise dans la session.');
-            return;
-        }
+            if (!playerName) {
+                sendError(res, 400, 'Entre un pseudo avant de rejoindre la session.');
+                return;
+            }
 
-        if (session.players.length >= session.settings.players) {
-            sendError(res, 400, 'Ce salon est actuellement complet.');
-            return;
-        }
+            const existingByName = session.players.find((entry) => entry.name.toLowerCase() === playerName.toLowerCase());
+            if (existingByName) {
+                sendError(res, 400, 'Ce pseudo est deja utilise dans la session.');
+                return;
+            }
 
-        const playerId = randomPlayerId();
-        session.players.push({ id: playerId, name: playerName });
-        session.alivePlayerIds.push(playerId);
-        updateSessionRevision(session);
-        sendJson(res, 201, {
-            code,
-            playerId,
-            playerName
+            if (session.players.length >= session.settings.players) {
+                sendError(res, 400, 'Ce salon est actuellement complet.');
+                return;
+            }
+
+            const playerId = randomPlayerId();
+            session.players.push({ id: playerId, name: playerName });
+            session.alivePlayerIds.push(playerId);
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 201, {
+                code,
+                playerId,
+                playerName
+            });
         });
         return;
     }
@@ -1117,10 +1319,10 @@ async function handleApiRequest(req, res, pathname, searchParams) {
     if (req.method === 'GET' && pathname === '/api/session/state') {
         const code = searchParams.get('code');
         const playerId = searchParams.get('playerId');
-        const session = ensureSession(code);
+        const session = await ensureSession(code);
 
         if (!session) {
-            sendMissingSessionError(res, code);
+            await sendMissingSessionError(res, code);
             return;
         }
 
@@ -1135,448 +1337,484 @@ async function handleApiRequest(req, res, pathname, searchParams) {
 
     if (req.method === 'POST' && pathname === '/api/session/leave') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendJson(res, 200, { left: true, deleted: true });
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                sendJson(res, 200, { left: true, deleted: true });
+                return;
+            }
 
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendJson(res, 200, { left: true, deleted: false });
-            return;
-        }
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendJson(res, 200, { left: true, deleted: false });
+                return;
+            }
 
-        const removal = removePlayerFromSession(session, player.id);
-        if (!removal.deleted) {
-            updateSessionRevision(session);
-        }
+            const removal = removePlayerFromSession(session, player.id);
+            if (removal.deleted) {
+                await deleteSessionStorage(session.code);
+                if (removal.closedByHost && removal.message) {
+                    await rememberClosedSession(session.code, removal.message);
+                }
+            } else {
+                updateSessionRevision(session);
+                await saveSession(session);
+            }
 
-        sendJson(res, 200, {
-            left: true,
-            deleted: removal.deleted,
-            closedByHost: Boolean(removal.closedByHost),
-            message: removal.message || ''
+            sendJson(res, 200, {
+                left: true,
+                deleted: removal.deleted,
+                closedByHost: Boolean(removal.closedByHost),
+                message: removal.message || ''
+            });
         });
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/kick') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
+                return;
+            }
 
-        const hostPlayer = ensurePlayer(session, body.playerId);
-        if (!hostPlayer) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
+            const hostPlayer = ensurePlayer(session, body.playerId);
+            if (!hostPlayer) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
+                return;
+            }
 
-        if (session.hostPlayerId !== hostPlayer.id) {
-            sendError(res, 403, "Seul l hote peut exclure un joueur.");
-            return;
-        }
+            if (session.hostPlayerId !== hostPlayer.id) {
+                sendError(res, 403, "Seul l hote peut exclure un joueur.");
+                return;
+            }
 
-        const targetPlayerId = String(body.targetPlayerId || '').trim();
-        const targetPlayer = ensurePlayer(session, targetPlayerId);
-        if (!targetPlayer) {
-            sendError(res, 404, 'Ce joueur n est plus dans la session.');
-            return;
-        }
+            const targetPlayerId = String(body.targetPlayerId || '').trim();
+            const targetPlayer = ensurePlayer(session, targetPlayerId);
+            if (!targetPlayer) {
+                sendError(res, 404, 'Ce joueur n est plus dans la session.');
+                return;
+            }
 
-        if (targetPlayer.id === hostPlayer.id) {
-            sendError(res, 400, 'L hote ne peut pas s exclure lui-meme.');
-            return;
-        }
+            if (targetPlayer.id === hostPlayer.id) {
+                sendError(res, 400, 'L hote ne peut pas s exclure lui-meme.');
+                return;
+            }
 
-        const removal = removePlayerFromSession(session, targetPlayer.id);
-        if (removal.deleted) {
-            sendJson(res, 200, {
-                kickedPlayerId: targetPlayer.id,
-                kickedPlayerName: targetPlayer.name,
-                deleted: true
-            });
-            return;
-        }
+            const removal = removePlayerFromSession(session, targetPlayer.id);
+            if (removal.deleted) {
+                await deleteSessionStorage(session.code);
+                sendJson(res, 200, {
+                    kickedPlayerId: targetPlayer.id,
+                    kickedPlayerName: targetPlayer.name,
+                    deleted: true
+                });
+                return;
+            }
 
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, hostPlayer.id));
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 200, buildSessionView(session, hostPlayer.id));
+        });
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/settings') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
+                return;
+            }
 
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
+                return;
+            }
 
-        if (session.hostPlayerId !== player.id) {
-            sendError(res, 403, "Seul l hote peut modifier les parametres.");
-            return;
-        }
+            if (session.hostPlayerId !== player.id) {
+                sendError(res, 403, "Seul l hote peut modifier les parametres.");
+                return;
+            }
 
-        if (session.status !== 'waiting') {
-            sendError(res, 400, 'La partie a deja commence.');
-            return;
-        }
+            if (session.status !== 'waiting') {
+                sendError(res, 400, 'La partie a deja commence.');
+                return;
+            }
 
-        const nextSettings = normalizeSettings(
-            body.settings || {},
-            session.settings,
-            String(body.preferredRole || '').trim()
-        );
-        if (nextSettings.players < session.players.length) {
-            sendError(res, 400, 'Le nombre de joueurs ne peut pas etre inferieur au nombre de joueurs deja connectes.');
-            return;
-        }
+            const nextSettings = normalizeSettings(
+                body.settings || {},
+                session.settings,
+                String(body.preferredRole || '').trim()
+            );
+            if (nextSettings.players < session.players.length) {
+                sendError(res, 400, 'Le nombre de joueurs ne peut pas etre inferieur au nombre de joueurs deja connectes.');
+                return;
+            }
 
-        session.settings = nextSettings;
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, player.id));
+            session.settings = nextSettings;
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 200, buildSessionView(session, player.id));
+        });
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/start') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
+                return;
+            }
 
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
+                return;
+            }
 
-        if (session.hostPlayerId !== player.id) {
-            sendError(res, 403, "Seul l hote peut lancer la partie.");
-            return;
-        }
+            if (session.hostPlayerId !== player.id) {
+                sendError(res, 403, "Seul l hote peut lancer la partie.");
+                return;
+            }
 
-        if (session.players.length !== session.settings.players) {
-            sendError(res, 400, `Il faut ${session.settings.players} joueurs connectes avant de lancer la partie.`);
-            return;
-        }
+            if (session.players.length !== session.settings.players) {
+                sendError(res, 400, `Il faut ${session.settings.players} joueurs connectes avant de lancer la partie.`);
+                return;
+            }
 
-        buildAssignments(session);
-        session.alivePlayerIds = session.players.map((entry) => entry.id);
-        session.turnOrderPlayerIds = shuffle(session.players.map((entry) => entry.id));
-        session.secretAcknowledged = new Set();
-        session.clues = [];
-        session.clueHistory = [];
-        session.activeClueIndex = 0;
-        session.roundNumber = 1;
-        session.discussionMessages = [];
-        session.votes = {};
-        session.mrWhiteGuess = null;
-        session.mrWhiteGuessResult = null;
-        session.lastRoundSummary = null;
-        session.winner = null;
-        session.status = 'secrets';
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, player.id));
+            buildAssignments(session);
+            session.alivePlayerIds = session.players.map((entry) => entry.id);
+            session.turnOrderPlayerIds = shuffle(session.players.map((entry) => entry.id));
+            session.secretAcknowledged = new Set();
+            session.clues = [];
+            session.clueHistory = [];
+            session.activeClueIndex = 0;
+            session.roundNumber = 1;
+            session.discussionMessages = [];
+            session.votes = {};
+            session.mrWhiteGuess = null;
+            session.mrWhiteGuessResult = null;
+            session.lastRoundSummary = null;
+            session.winner = null;
+            session.status = 'secrets';
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 200, buildSessionView(session, player.id));
+        });
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/return-to-lobby') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
+                return;
+            }
 
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
+                return;
+            }
 
-        if (session.hostPlayerId !== player.id) {
-            sendError(res, 403, "Seul l hote peut renvoyer tout le monde au salon.");
-            return;
-        }
+            if (session.hostPlayerId !== player.id) {
+                sendError(res, 403, "Seul l hote peut renvoyer tout le monde au salon.");
+                return;
+            }
 
-        if (session.status === 'waiting') {
+            if (session.status === 'waiting') {
+                sendJson(res, 200, buildSessionView(session, player.id));
+                return;
+            }
+
+            returnSessionToWaiting(session);
+            updateSessionRevision(session);
+            await saveSession(session);
             sendJson(res, 200, buildSessionView(session, player.id));
-            return;
-        }
-
-        returnSessionToWaiting(session);
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, player.id));
+        });
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/mrwhite-guess') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
+                return;
+            }
 
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
+                return;
+            }
 
-        if (session.status !== 'mrwhite_guess' || !session.mrWhiteGuess) {
-            sendError(res, 400, 'MrWhite ne peut pas dechiffrer le mot pour le moment.');
-            return;
-        }
+            if (session.status !== 'mrwhite_guess' || !session.mrWhiteGuess) {
+                sendError(res, 400, 'MrWhite ne peut pas dechiffrer le mot pour le moment.');
+                return;
+            }
 
-        const eligibleGuessers = session.mrWhiteGuess.playerIds || [session.mrWhiteGuess.playerId];
-        if (!eligibleGuessers.includes(player.id)) {
-            sendError(res, 403, 'Seul MrWhite peut dechiffrer le mot des civils.');
-            return;
-        }
+            const eligibleGuessers = session.mrWhiteGuess.playerIds || [session.mrWhiteGuess.playerId];
+            if (!eligibleGuessers.includes(player.id)) {
+                sendError(res, 403, 'Seul MrWhite peut dechiffrer le mot des civils.');
+                return;
+            }
 
-        const guessedWord = String(body.guessedWord || '').replace(/\s+/g, ' ').trim().substring(0, 24);
-        const skipped = Boolean(body.skip);
-        if (!skipped && !guessedWord) {
-            sendError(res, 400, 'Entre un mot avant de valider.');
-            return;
-        }
+            const guessedWord = String(body.guessedWord || '').replace(/\s+/g, ' ').trim().substring(0, 24);
+            const skipped = Boolean(body.skip);
+            if (!skipped && !guessedWord) {
+                sendError(res, 400, 'Entre un mot avant de valider.');
+                return;
+            }
 
-        resolveMrWhiteGuess(session, guessedWord, skipped, player.id);
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, player.id));
+            resolveMrWhiteGuess(session, guessedWord, skipped, player.id);
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 200, buildSessionView(session, player.id));
+        });
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/ack-secret') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
+                return;
+            }
 
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
+                return;
+            }
 
-        if (session.status !== 'secrets') {
-            sendError(res, 400, "La phase de memorisation n est plus active.");
-            return;
-        }
+            if (session.status !== 'secrets') {
+                sendError(res, 400, "La phase de memorisation n est plus active.");
+                return;
+            }
 
-        session.secretAcknowledged.add(player.id);
-        if (session.secretAcknowledged.size === session.players.length) {
-            session.status = 'clues';
-            session.activeClueIndex = 0;
-        }
+            session.secretAcknowledged.add(player.id);
+            if (session.secretAcknowledged.size === session.players.length) {
+                session.status = 'clues';
+                session.activeClueIndex = 0;
+            }
 
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, player.id));
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 200, buildSessionView(session, player.id));
+        });
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/submit-clue') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
+                return;
+            }
 
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
+                return;
+            }
 
-        if (session.status !== 'clues') {
-            sendError(res, 400, 'La phase des mots n est pas active.');
-            return;
-        }
+            if (session.status !== 'clues') {
+                sendError(res, 400, 'La phase des mots n est pas active.');
+                return;
+            }
 
-        if (!isPlayerAlive(session, player.id)) {
-            sendError(res, 400, 'Ce joueur a deja ete elimine.');
-            return;
-        }
+            if (!isPlayerAlive(session, player.id)) {
+                sendError(res, 400, 'Ce joueur a deja ete elimine.');
+                return;
+            }
 
-        const activePlayer = getActiveCluePlayer(session);
-        if (!activePlayer || activePlayer.id !== player.id) {
-            sendError(res, 400, 'Ce n est pas encore ton tour.');
-            return;
-        }
+            const activePlayer = getActiveCluePlayer(session);
+            if (!activePlayer || activePlayer.id !== player.id) {
+                sendError(res, 400, 'Ce n est pas encore ton tour.');
+                return;
+            }
 
-        const text = String(body.text || '').trim().substring(0, 24);
-        if (!text) {
-            sendError(res, 400, 'Entre un mot avant de valider.');
-            return;
-        }
+            const text = String(body.text || '').trim().substring(0, 24);
+            if (!text) {
+                sendError(res, 400, 'Entre un mot avant de valider.');
+                return;
+            }
 
-        const normalizedText = normalizeClueText(text);
+            const normalizedText = normalizeClueText(text);
 
-        if (session.clues.some((clue) => clue.playerId === player.id)) {
-            sendError(res, 400, 'Tu as deja propose un mot pour ce tour.');
-            return;
-        }
+            if (session.clues.some((clue) => clue.playerId === player.id)) {
+                sendError(res, 400, 'Tu as deja propose un mot pour ce tour.');
+                return;
+            }
 
-        if ((session.clueHistory || []).some((clue) => normalizeClueText(clue.text) === normalizedText)) {
-            sendError(res, 400, 'Ce mot a deja ete propose pendant cette partie.');
-            return;
-        }
+            if ((session.clueHistory || []).some((clue) => normalizeClueText(clue.text) === normalizedText)) {
+                sendError(res, 400, 'Ce mot a deja ete propose pendant cette partie.');
+                return;
+            }
 
-        session.clues.push({
-            playerId: player.id,
-            text
+            session.clues.push({
+                playerId: player.id,
+                text
+            });
+            session.clueHistory.push({
+                roundNumber: session.roundNumber,
+                playerId: player.id,
+                text
+            });
+
+            const alivePlayers = getAlivePlayers(session);
+            if (session.clues.length >= alivePlayers.length) {
+                session.status = 'discussion';
+                session.discussionMessages = [];
+                session.votes = {};
+                session.activeClueIndex = 0;
+            } else {
+                session.activeClueIndex += 1;
+            }
+
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 200, buildSessionView(session, player.id));
         });
-        session.clueHistory.push({
-            roundNumber: session.roundNumber,
-            playerId: player.id,
-            text
-        });
-
-        const alivePlayers = getAlivePlayers(session);
-        if (session.clues.length >= alivePlayers.length) {
-            session.status = 'discussion';
-            session.discussionMessages = [];
-            session.votes = {};
-            session.activeClueIndex = 0;
-        } else {
-            session.activeClueIndex += 1;
-        }
-
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, player.id));
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/chat') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
+                return;
+            }
 
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
+                return;
+            }
 
-        if (session.status !== 'discussion') {
-            sendError(res, 400, 'Le debat nest pas encore ouvert.');
-            return;
-        }
+            if (session.status !== 'discussion') {
+                sendError(res, 400, 'Le debat nest pas encore ouvert.');
+                return;
+            }
 
-        if (!isPlayerAlive(session, player.id)) {
-            sendError(res, 400, 'Les joueurs elimines ne peuvent plus parler dans le debat.');
-            return;
-        }
+            if (!isPlayerAlive(session, player.id)) {
+                sendError(res, 400, 'Les joueurs elimines ne peuvent plus parler dans le debat.');
+                return;
+            }
 
-        const text = normalizeChatMessage(body.text);
-        if (!text) {
-            sendError(res, 400, 'Entre un message avant de lenvoyer.');
-            return;
-        }
+            const text = normalizeChatMessage(body.text);
+            if (!text) {
+                sendError(res, 400, 'Entre un message avant de lenvoyer.');
+                return;
+            }
 
-        session.discussionMessages.push({
-            id: randomMessageId(),
-            playerId: player.id,
-            playerName: player.name,
-            text,
-            sentAt: Date.now()
+            session.discussionMessages.push({
+                id: randomMessageId(),
+                playerId: player.id,
+                playerName: player.name,
+                text,
+                sentAt: Date.now()
+            });
+
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 200, buildSessionView(session, player.id));
         });
-
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, player.id));
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/session/vote') {
         const body = await readJsonBody(req);
-        const session = ensureSession(body.code);
-        if (!session) {
-            sendMissingSessionError(res, body.code);
-            return;
-        }
-
-        const player = ensurePlayer(session, body.playerId);
-        if (!player) {
-            sendError(res, 403, 'Joueur non reconnu pour cette session.');
-            return;
-        }
-
-        if (session.status !== 'discussion') {
-            sendError(res, 400, 'Le vote nest pas ouvert.');
-            return;
-        }
-
-        if (!isPlayerAlive(session, player.id)) {
-            sendError(res, 400, 'Les joueurs elimines ne peuvent plus voter.');
-            return;
-        }
-
-        if (session.votes[player.id]) {
-            sendError(res, 400, 'Tu as deja vote pour ce debat.');
-            return;
-        }
-
-        const voteType = String(body.type || '').trim().toLowerCase();
-        if (voteType !== 'skip' && voteType !== 'accuse') {
-            sendError(res, 400, 'Vote invalide.');
-            return;
-        }
-
-        if (voteType === 'skip') {
-            session.votes[player.id] = {
-                type: 'skip',
-                submittedAt: Date.now()
-            };
-        } else {
-            const targetPlayerId = String(body.targetPlayerId || '').trim();
-            const guessedRole = normalizeVoteRole(body.guessedRole);
-            const target = ensurePlayer(session, targetPlayerId);
-            const allowedRoles = getConfiguredGuessRoles(session);
-
-            if (!target || !isPlayerAlive(session, target.id)) {
-                sendError(res, 400, 'Ce joueur ne peut pas etre vise par le vote.');
+        await withSessionLock(body.code, async () => {
+            const session = await ensureSession(body.code);
+            if (!session) {
+                await sendMissingSessionError(res, body.code);
                 return;
             }
 
-            if (target.id === player.id) {
-                sendError(res, 400, 'Tu ne peux pas voter contre toi meme.');
+            const player = ensurePlayer(session, body.playerId);
+            if (!player) {
+                sendError(res, 403, 'Joueur non reconnu pour cette session.');
                 return;
             }
 
-            if (!guessedRole || !allowedRoles.includes(guessedRole)) {
-                sendError(res, 400, 'Choisis un role valide avant de voter.');
+            if (session.status !== 'discussion') {
+                sendError(res, 400, 'Le vote nest pas ouvert.');
                 return;
             }
 
-            session.votes[player.id] = {
-                type: 'accuse',
-                targetPlayerId: target.id,
-                guessedRole,
-                submittedAt: Date.now()
-            };
-        }
+            if (!isPlayerAlive(session, player.id)) {
+                sendError(res, 400, 'Les joueurs elimines ne peuvent plus voter.');
+                return;
+            }
 
-        resolveDiscussion(session);
-        updateSessionRevision(session);
-        sendJson(res, 200, buildSessionView(session, player.id));
+            if (session.votes[player.id]) {
+                sendError(res, 400, 'Tu as deja vote pour ce debat.');
+                return;
+            }
+
+            const voteType = String(body.type || '').trim().toLowerCase();
+            if (voteType !== 'skip' && voteType !== 'accuse') {
+                sendError(res, 400, 'Vote invalide.');
+                return;
+            }
+
+            if (voteType === 'skip') {
+                session.votes[player.id] = {
+                    type: 'skip',
+                    submittedAt: Date.now()
+                };
+            } else {
+                const targetPlayerId = String(body.targetPlayerId || '').trim();
+                const guessedRole = normalizeVoteRole(body.guessedRole);
+                const target = ensurePlayer(session, targetPlayerId);
+                const allowedRoles = getConfiguredGuessRoles(session);
+
+                if (!target || !isPlayerAlive(session, target.id)) {
+                    sendError(res, 400, 'Ce joueur ne peut pas etre vise par le vote.');
+                    return;
+                }
+
+                if (target.id === player.id) {
+                    sendError(res, 400, 'Tu ne peux pas voter contre toi meme.');
+                    return;
+                }
+
+                if (!guessedRole || !allowedRoles.includes(guessedRole)) {
+                    sendError(res, 400, 'Choisis un role valide avant de voter.');
+                    return;
+                }
+
+                session.votes[player.id] = {
+                    type: 'accuse',
+                    targetPlayerId: target.id,
+                    guessedRole,
+                    submittedAt: Date.now()
+                };
+            }
+
+            resolveDiscussion(session);
+            updateSessionRevision(session);
+            await saveSession(session);
+            sendJson(res, 200, buildSessionView(session, player.id));
+        });
         return;
     }
 
