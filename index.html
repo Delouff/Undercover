@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Undercover</title>
     <meta name="theme-color" content="#151311">
+    <link rel="canonical" href="https://undercover-lime.vercel.app/">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2216%22 fill=%22%23111212%22/%3E%3Cg fill=%22none%22 stroke=%22%2387d9a3%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-width=%224%22%3E%3Cellipse cx=%2230%22 cy=%2228%22 rx=%2216%22 ry=%2210%22 fill=%22%23244b3f%22/%3E%3Ccircle cx=%2218%22 cy=%2226%22 r=%226%22 fill=%22%23244b3f%22/%3E%3Cpath d=%22M44 29c8 2 12 8 11 14-1 6-5 10-10 10-5 0-9-3-9-8 0-3 2-6 6-6 3 0 5 2 5 5 0 2-1 4-3 5%22/%3E%3Cpath d=%22M25 37l-5 10%22/%3E%3Cpath d=%22M34 37l5 10%22/%3E%3Cpath d=%22M34 19l10-6%22/%3E%3C/g%3E%3Ccircle cx=%2216.5%22 cy=%2225.2%22 r=%221.6%22 fill=%22%23f5ffd9%22/%3E%3Ccircle cx=%2216.7%22 cy=%2225.2%22 r=%220.8%22 fill=%22%230b0f0d%22/%3E%3C/svg%3E">
     <style>
         :root {
@@ -2188,6 +2189,10 @@
     <script>
         // Gestion des boutons de session multijoueur
         document.addEventListener('DOMContentLoaded', function() {
+            if (enforceCanonicalPublicOrigin()) {
+                return;
+            }
+
             const createBtn = document.getElementById('createSessionBtn');
             const joinBtn = document.getElementById('joinSessionBtn');
             const sharedSessionCode = getSessionCodeFromUrl();
@@ -2249,6 +2254,8 @@
         const ONLINE_AUTH_STORAGE_KEY = 'undercover_online_auth';
         const PUBLIC_SHARE_URL_STORAGE_KEY = 'undercover_public_share_url';
         const PENDING_INFO_STORAGE_KEY = 'undercover_pending_info';
+        const CANONICAL_PUBLIC_ORIGIN = 'https://undercover-lime.vercel.app';
+        const CANONICAL_PUBLIC_HOSTNAME = 'undercover-lime.vercel.app';
 
         function getDefaultSessionSettings() {
             return {
@@ -2773,6 +2780,11 @@
             return false;
         }
 
+        function isVercelHostname(hostname) {
+            const value = String(hostname || '').trim().toLowerCase();
+            return value.endsWith('.vercel.app');
+        }
+
         function normalizePublicShareUrl(value) {
             if (!value) return '';
 
@@ -2780,6 +2792,10 @@
                 const url = new URL(String(value).trim());
                 if (url.protocol !== 'http:' && url.protocol !== 'https:') {
                     return '';
+                }
+
+                if (isVercelHostname(url.hostname)) {
+                    return CANONICAL_PUBLIC_ORIGIN;
                 }
 
                 return url.origin;
@@ -2811,6 +2827,27 @@
         function getCurrentShareBaseUrl() {
             if (!isServedByNodeServer()) return '';
             return normalizePublicShareUrl(window.location.origin);
+        }
+
+        function enforceCanonicalPublicOrigin() {
+            if (!isServedByNodeServer()) {
+                return false;
+            }
+
+            try {
+                const currentUrl = new URL(window.location.href);
+                if (!isVercelHostname(currentUrl.hostname) || currentUrl.hostname === CANONICAL_PUBLIC_HOSTNAME) {
+                    return false;
+                }
+
+                currentUrl.protocol = 'https:';
+                currentUrl.hostname = CANONICAL_PUBLIC_HOSTNAME;
+                currentUrl.port = '';
+                window.location.replace(currentUrl.toString());
+                return true;
+            } catch (error) {
+                return false;
+            }
         }
 
         function captureCurrentPublicShareBaseUrl() {
