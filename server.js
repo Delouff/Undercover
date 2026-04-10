@@ -1824,19 +1824,25 @@ async function handleApiRequest(req, res, pathname, searchParams) {
 async function requestHandler(req, res) {
     try {
         const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const rewrittenApiAction = requestUrl.pathname === '/api/session'
+            ? String(requestUrl.searchParams.get('action') || '').replace(/^\/+|\/+$/g, '')
+            : '';
+        const effectivePathname = rewrittenApiAction
+            ? `/api/session/${rewrittenApiAction}`
+            : requestUrl.pathname;
 
-        if (requestUrl.pathname.startsWith('/api/')) {
-            await handleApiRequest(req, res, requestUrl.pathname, requestUrl.searchParams);
+        if (effectivePathname.startsWith('/api/')) {
+            await handleApiRequest(req, res, effectivePathname, requestUrl.searchParams);
             return;
         }
 
-        if (requestUrl.pathname === '/favicon.ico') {
+        if (effectivePathname === '/favicon.ico') {
             res.writeHead(204);
             res.end();
             return;
         }
 
-        serveStaticFile(req, res, requestUrl.pathname);
+        serveStaticFile(req, res, effectivePathname);
     } catch (error) {
         sendError(res, 500, error.message || 'Une erreur serveur est survenue.');
     }

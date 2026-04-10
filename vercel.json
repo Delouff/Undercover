@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["cdg1"]
+  "regions": ["cdg1"],
+  "rewrites": [
+    {
+      "source": "/api/session/:action",
+      "destination": "/api/session?action=:action"
+    }
+  ]
 }
