@@ -2256,6 +2256,7 @@
         const PENDING_INFO_STORAGE_KEY = 'undercover_pending_info';
         const CANONICAL_PUBLIC_ORIGIN = 'https://undercover-lime.vercel.app';
         const CANONICAL_PUBLIC_HOSTNAME = 'undercover-lime.vercel.app';
+        const LOCAL_NODE_SERVER_PORT = '3000';
 
         function getDefaultSessionSettings() {
             return {
@@ -2892,6 +2893,26 @@
             return window.location.protocol === 'http:' || window.location.protocol === 'https:';
         }
 
+        function getApiRequestUrl(path) {
+            if (!path || !path.startsWith('/')) {
+                return path;
+            }
+
+            if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+                return path;
+            }
+
+            const hostname = window.location.hostname;
+            const isLocalDevHost = isLocalHostname(hostname) && window.location.port && window.location.port !== LOCAL_NODE_SERVER_PORT;
+            if (!isLocalDevHost) {
+                return path;
+            }
+
+            const apiUrl = new URL(path, window.location.origin);
+            apiUrl.port = LOCAL_NODE_SERVER_PORT;
+            return apiUrl.toString();
+        }
+
         function loadOnlineSessionAuth() {
             try {
                 const rawValue = window.localStorage.getItem(ONLINE_AUTH_STORAGE_KEY);
@@ -2988,7 +3009,7 @@
 
             let response;
             try {
-                response = await fetch(path, requestOptions);
+                response = await fetch(getApiRequestUrl(path), requestOptions);
             } catch (error) {
                 throw new Error("Impossible de contacter le serveur multijoueur. Verifie que le backend est bien disponible.");
             }

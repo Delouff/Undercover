@@ -33,14 +33,31 @@ const SESSION_LOCK_RETRY_DELAY_MS = 120;
 const STORAGE_PREFIX = 'undercover';
 const REDIS_REST_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
 const REDIS_REST_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
-const SHARED_STORAGE_ENABLED = Boolean(REDIS_REST_URL && REDIS_REST_TOKEN);
+const REDIS_REST_URL_IS_VALID = /^https?:\/\//i.test(REDIS_REST_URL);
+const SHARED_STORAGE_ENABLED = Boolean(REDIS_REST_URL && REDIS_REST_TOKEN && REDIS_REST_URL_IS_VALID);
 const VERCEL_RUNTIME = Boolean(process.env.VERCEL);
+
+class HttpError extends Error {
+    constructor(statusCode, message) {
+        super(message);
+        this.statusCode = statusCode;
+    }
+}
+
+function getCorsHeaders() {
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+    };
+}
 
 function sendJson(res, statusCode, payload) {
     const body = JSON.stringify(payload);
     res.writeHead(statusCode, {
         'Content-Type': 'application/json; charset=utf-8',
-        'Content-Length': Buffer.byteLength(body)
+        'Content-Length': Buffer.byteLength(body),
+        ...getCorsHeaders()
     });
     res.end(body);
 }
@@ -87,22 +104,31 @@ function ensureStorageReady() {
         return true;
     }
 
+    if (REDIS_REST_URL && !REDIS_REST_URL_IS_VALID) {
+        throw new Error("L'URL Redis configuree sur Vercel doit etre une URL REST en https. Verifie KV_REST_API_URL ou UPSTASH_REDIS_REST_URL dans les variables d'environnement.");
+    }
+
     throw new Error("Le multijoueur sur Vercel a besoin d'un stockage partage Upstash Redis. Ajoute l'integration depuis le Marketplace Vercel pour activer les sessions.");
 }
 
 async function redisCommand(command) {
-    const response = await fetch(REDIS_REST_URL, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${REDIS_REST_TOKEN}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(command)
-    });
+    let response;
+    try {
+        response = await fetch(REDIS_REST_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${REDIS_REST_TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(command)
+        });
+    } catch (error) {
+        throw new HttpError(503, "Impossible de contacter Redis depuis Vercel. Verifie que KV_REST_API_URL et KV_REST_API_TOKEN pointent vers l'URL REST https d'Upstash, puis redeploie.");
+    }
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.error) {
-        throw new Error(payload.error || 'Impossible de contacter le stockage partage.');
+        throw new HttpError(503, payload.error || 'Impossible de contacter le stockage partage.');
     }
 
     return payload.result;
@@ -1831,6 +1857,12 @@ async function requestHandler(req, res) {
             ? `/api/session/${rewrittenApiAction}`
             : requestUrl.pathname;
 
+        if (effectivePathname.startsWith('/api/') && req.method === 'OPTIONS') {
+            res.writeHead(204, getCorsHeaders());
+            res.end();
+            return;
+        }
+
         if (effectivePathname.startsWith('/api/')) {
             await handleApiRequest(req, res, effectivePathname, requestUrl.searchParams);
             return;
@@ -1844,7 +1876,7 @@ async function requestHandler(req, res) {
 
         serveStaticFile(req, res, effectivePathname);
     } catch (error) {
-        sendError(res, 500, error.message || 'Une erreur serveur est survenue.');
+        sendError(res, error.statusCode || 500, error.message || 'Une erreur serveur est survenue.');
     }
 }
 
