@@ -31,8 +31,12 @@ const SESSION_LOCK_TTL_SECONDS = 8;
 const SESSION_LOCK_RETRY_COUNT = 20;
 const SESSION_LOCK_RETRY_DELAY_MS = 120;
 const STORAGE_PREFIX = 'undercover';
-const REDIS_REST_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
-const REDIS_REST_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+function cleanEnvValue(value) {
+    return String(value || '').trim().replace(/^['"]|['"]$/g, '').trim();
+}
+
+const REDIS_REST_URL = cleanEnvValue(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '');
+const REDIS_REST_TOKEN = cleanEnvValue(process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '');
 const REDIS_REST_URL_IS_VALID = /^https?:\/\//i.test(REDIS_REST_URL);
 const SHARED_STORAGE_ENABLED = Boolean(REDIS_REST_URL && REDIS_REST_TOKEN && REDIS_REST_URL_IS_VALID);
 const VERCEL_RUNTIME = Boolean(process.env.VERCEL);
@@ -109,6 +113,42 @@ function ensureStorageReady() {
     }
 
     throw new Error("Le multijoueur sur Vercel a besoin d'un stockage partage Upstash Redis. Ajoute l'integration depuis le Marketplace Vercel pour activer les sessions.");
+}
+
+function getRedisHostForDiagnostics() {
+    if (!REDIS_REST_URL_IS_VALID) {
+        return '';
+    }
+
+    try {
+        return new URL(REDIS_REST_URL).hostname;
+    } catch (error) {
+        return '';
+    }
+}
+
+async function buildStorageHealthPayload(shouldCheckConnection = false) {
+    const payload = {
+        vercel: VERCEL_RUNTIME,
+        redisUrlConfigured: Boolean(REDIS_REST_URL),
+        redisTokenConfigured: Boolean(REDIS_REST_TOKEN),
+        redisUrlValid: REDIS_REST_URL_IS_VALID,
+        redisHost: getRedisHostForDiagnostics(),
+        sharedStorageEnabled: SHARED_STORAGE_ENABLED,
+        redisConnection: shouldCheckConnection ? 'not_checked' : 'skipped'
+    };
+
+    if (shouldCheckConnection && SHARED_STORAGE_ENABLED) {
+        try {
+            await redisCommand(['PING']);
+            payload.redisConnection = 'ok';
+        } catch (error) {
+            payload.redisConnection = 'failed';
+            payload.error = error.message || 'Impossible de contacter Redis.';
+        }
+    }
+
+    return payload;
 }
 
 async function redisCommand(command) {
@@ -1230,6 +1270,13 @@ function serveStaticFile(req, res, pathname) {
 }
 
 async function handleApiRequest(req, res, pathname, searchParams) {
+    if (req.method === 'GET' && pathname === '/api/session/health') {
+        const shouldCheckConnection = searchParams.get('check') === '1';
+        const payload = await buildStorageHealthPayload(shouldCheckConnection);
+        sendJson(res, payload.redisConnection === 'failed' ? 503 : 200, payload);
+        return;
+    }
+
     try {
         ensureStorageReady();
     } catch (error) {
