@@ -1199,7 +1199,7 @@ async function readJsonBody(req) {
             try {
                 resolve(JSON.parse(data));
             } catch (error) {
-                reject(new Error('Le JSON envoye est invalide.'));
+                reject(new HttpError(400, 'Le JSON envoye est invalide.'));
             }
         });
         req.on('error', reject);
